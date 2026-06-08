@@ -7,9 +7,12 @@ depend on a request-scoped FastAPI dependency.
 The instance is mounted in `app/main.py` at `/mcp` over Streamable HTTP.
 """
 
+from collections.abc import Awaitable, Callable
+from typing import Any
 from uuid import UUID
 
 from fastmcp import FastMCP
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.database import async_session_factory
 from app.models.todo import TodoCreate, TodoRead, TodoUpdate
@@ -18,23 +21,19 @@ from app.services import todo_service
 mcp = FastMCP("mytodo")
 
 
-def _serialize(todo: TodoRead) -> dict:
+def _serialize(todo: TodoRead) -> dict[str, Any]:
     """Serialize a TodoRead to a JSON-friendly dict (datetimes → ISO strings)."""
     return todo.model_dump(mode="json")
 
 
-async def _session_do(coro):
-    """Run a service coroutine inside its own AsyncSession and return its result.
-
-    Centralizing session management here means each tool only declares the
-    service-level work it actually wants to do.
-    """
+async def _session_do[T](coro: Callable[[AsyncSession], Awaitable[T]]) -> T:
+    """Run a service coroutine inside its own AsyncSession and return its result."""
     async with async_session_factory() as session:
         return await coro(session)
 
 
 @mcp.tool
-async def list_todos(completed: bool | None = None) -> list[dict]:
+async def list_todos(completed: bool | None = None) -> list[dict[str, Any]]:
     """List all todos. Optionally filter by completion status.
 
     Args:
@@ -46,7 +45,7 @@ async def list_todos(completed: bool | None = None) -> list[dict]:
 
 
 @mcp.tool
-async def get_todo(todo_id: str) -> dict:
+async def get_todo(todo_id: str) -> dict[str, Any]:
     """Fetch a single todo by its UUID.
 
     Args:
@@ -64,7 +63,7 @@ async def get_todo(todo_id: str) -> dict:
 
 
 @mcp.tool
-async def create_todo(title: str, description: str | None = None) -> dict:
+async def create_todo(title: str, description: str | None = None) -> dict[str, Any]:
     """Create a new todo.
 
     Args:
@@ -82,7 +81,7 @@ async def update_todo(
     title: str | None = None,
     description: str | None = None,
     is_completed: bool | None = None,
-) -> dict:
+) -> dict[str, Any]:
     """Update an existing todo. Only the fields you provide are changed.
 
     Args:
@@ -98,7 +97,7 @@ async def update_todo(
 
     # Only include fields the caller explicitly provided; passing None explicitly
     # marks them as "set" in Pydantic v2, which would overwrite existing values.
-    changes: dict = {
+    changes: dict[str, Any] = {
         k: v
         for k, v in {
             "title": title, "description": description, "is_completed": is_completed

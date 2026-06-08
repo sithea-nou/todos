@@ -2,9 +2,9 @@
 
 from uuid import UUID
 
+from sqlalchemy.ext.asyncio import AsyncSession
 from sqlmodel import select
 
-from app.database import AsyncSession
 from app.models.todo import Todo, TodoCreate, TodoRead, TodoUpdate
 
 

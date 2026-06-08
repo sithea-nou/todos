@@ -1,5 +1,6 @@
 """FastAPI application entry point."""
 
+from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 from pathlib import Path
 
@@ -14,7 +15,7 @@ from app.routers import todos
 
 
 @asynccontextmanager
-async def app_lifespan(app: FastAPI):
+async def app_lifespan(app: FastAPI) -> AsyncIterator[None]:
     """Database init on startup, cleanup on shutdown."""
     await init_db()
     yield
@@ -33,13 +34,13 @@ app.mount("/mcp", mcp_app)
 
 
 @app.get("/")
-async def serve_frontend():
+async def serve_frontend() -> HTMLResponse:
     """Serve the frontend HTML."""
     html_path = Path(__file__).parent.parent / "index.html"
     return HTMLResponse(content=html_path.read_text())
 
 
 @app.get("/health")
-async def health() -> dict:
+async def health() -> dict[str, str]:
     """Health check endpoint."""
     return {"status": "ok", "app": settings.app_name}

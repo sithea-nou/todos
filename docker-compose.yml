@@ -1,0 +1,15 @@
+services:
+  app:
+    build: .
+    container_name: mytodo-app
+    restart: unless-stopped
+    ports:
+      - "8000:8000"
+    environment:
+      - DATABASE_URL=sqlite+aiosqlite:////app/data/todos.db
+    volumes:
+      # Persist the SQLite DB across container restarts
+      - todos-data:/app/data
+
+volumes:
+  todos-data:

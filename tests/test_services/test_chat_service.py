@@ -1,6 +1,7 @@
 """Tests for the chat_service layer."""
 
 import json
+import os
 from collections.abc import AsyncGenerator
 from contextlib import asynccontextmanager
 from typing import Any
@@ -138,14 +139,15 @@ async def test_chat_simple_response() -> None:
     mock_resp = _make_llm_response("Here you go!")
     with patch("app.services.chat_service.litellm.acompletion", new_callable=AsyncMock) as mock_llm:
         mock_llm.return_value = mock_resp
-        result = await cs.chat("list my todos", [])
+        result, intermediate = await cs.chat("list my todos", [])
     assert result == "Here you go!"
+    assert intermediate == []
 
 
 async def test_chat_llm_error() -> None:
     with patch("app.services.chat_service.litellm.acompletion", new_callable=AsyncMock) as mock_llm:
         mock_llm.side_effect = Exception("timeout")
-        result = await cs.chat("hello", [])
+        result, _ = await cs.chat("hello", [])
     assert "Error communicating" in result
 
 
@@ -160,7 +162,208 @@ async def test_chat_with_tool_call(patched_session: AsyncSession) -> None:
 
     with patch("app.services.chat_service.litellm.acompletion", new_callable=AsyncMock) as mock_llm:
         mock_llm.side_effect = [tool_resp, final_resp]
-        result = await cs.chat("list my todos", [])
+        result, intermediate = await cs.chat("list my todos", [])
 
     assert result == "You have no todos."
     assert mock_llm.call_count == 2
+    # Intermediate should contain one assistant turn + one tool result
+    assert len(intermediate) == 2
+    assert intermediate[0]["role"] == "assistant"
+    assert intermediate[0]["tool_calls"][0]["function"]["name"] == "list_todos"
+    assert intermediate[1]["role"] == "tool"
+    assert intermediate[1]["tool_call_id"] == "call_1"
+
+
+# --- chat_stream() tests ---
+
+
+class _FakeDelta:
+    def __init__(self, content=None, tool_calls=None, role=None):
+        self.content = content
+        self.tool_calls = tool_calls
+        self.role = role
+
+
+class _FakeToolCall:
+    def __init__(self, index=0, id=None, name=None, arguments=None):
+        self.index = index
+        self.id = id
+        self.function = type("Fn", (), {"name": name, "arguments": arguments})()
+
+
+class _FakeChoice:
+    def __init__(self, delta, finish_reason=None):
+        self.delta = delta
+        self.finish_reason = finish_reason
+
+
+class _FakeChunk:
+    def __init__(self, delta=None, finish_reason=None, tool_calls=None):
+        if delta is None:
+            delta = _FakeDelta(content=None, tool_calls=tool_calls)
+        self.choices = [_FakeChoice(delta, finish_reason)]
+
+
+class _FakeAsyncStream:
+    """Async-iterable wrapper around a list of chunks."""
+
+    def __init__(self, chunks):
+        self._chunks = chunks
+        self._idx = 0
+
+    def __aiter__(self):
+        return self
+
+    async def __anext__(self):
+        if self._idx >= len(self._chunks):
+            raise StopAsyncIteration
+        chunk = self._chunks[self._idx]
+        self._idx += 1
+        return chunk
+
+
+async def test_chat_stream_yields_tokens_and_done() -> None:
+    chunks = [
+        _FakeChunk(delta=_FakeDelta(content="Hello", role="assistant")),
+        _FakeChunk(delta=_FakeDelta(content=" world")),
+        _FakeChunk(delta=_FakeDelta(content=""), finish_reason="stop"),
+    ]
+    fake_stream = _FakeAsyncStream(chunks)
+
+    with patch("app.services.chat_service.litellm.acompletion", new_callable=AsyncMock) as mock_llm:
+        mock_llm.return_value = fake_stream
+        events = []
+        async for evt in cs.chat_stream("hi", []):
+            events.append(evt)
+
+    assert events[0]["type"] == "token"
+    assert events[0]["delta"] == "Hello"
+    assert events[1]["delta"] == " world"
+    done = [e for e in events if e["type"] == "done"][-1]
+    assert done["response"] == "Hello world"
+
+
+async def test_chat_stream_emits_tool_event(patched_session: AsyncSession) -> None:
+    tool_chunks = [
+        _FakeChunk(
+            delta=_FakeDelta(
+                tool_calls=[_FakeToolCall(index=0, id="t1", name="list_todos", arguments="{}")],
+                role="assistant",
+            )
+        ),
+        _FakeChunk(delta=_FakeDelta(content=""), finish_reason="tool_calls"),
+    ]
+    final_text_chunks = [
+        _FakeChunk(delta=_FakeDelta(content="Done", role="assistant")),
+        _FakeChunk(delta=_FakeDelta(content=""), finish_reason="stop"),
+    ]
+
+    fake_streams = [_FakeAsyncStream(tool_chunks), _FakeAsyncStream(final_text_chunks)]
+
+    with patch("app.services.chat_service.litellm.acompletion", new_callable=AsyncMock) as mock_llm:
+        mock_llm.side_effect = fake_streams
+        events = []
+        async for evt in cs.chat_stream("list my todos", []):
+            events.append(evt)
+
+    tool_events = [e for e in events if e["type"] == "tool"]
+    assert tool_events, f"expected at least one tool event, got {events}"
+    assert tool_events[0]["name"] == "list_todos"
+    done = [e for e in events if e["type"] == "done"][-1]
+    assert done["response"] == "Done"
+
+
+async def test_chat_stream_parses_ollama_json_in_text(patched_session: AsyncSession) -> None:
+    """Ollama (streaming) may emit tool calls as plain JSON text instead of native tool_calls deltas."""
+    # First iteration: model returns tool call as text token
+    first_chunks = [
+        _FakeChunk(delta=_FakeDelta(content='{"name": "list_todos", "arguments": {}}'), finish_reason="stop"),
+    ]
+    # Second iteration: model answers with tool results
+    second_chunks = [
+        _FakeChunk(delta=_FakeDelta(content="Here are your todos")),
+        _FakeChunk(delta=_FakeDelta(content=""), finish_reason="stop"),
+    ]
+
+    fake_streams = [_FakeAsyncStream(first_chunks), _FakeAsyncStream(second_chunks)]
+
+    with patch("app.services.chat_service.litellm.acompletion", new_callable=AsyncMock) as mock_llm:
+        mock_llm.side_effect = fake_streams
+        events = []
+        async for evt in cs.chat_stream("list my todos", []):
+            events.append(evt)
+
+    tool_events = [e for e in events if e["type"] == "tool"]
+    assert tool_events, f"expected at least one tool event, got {events}"
+    assert tool_events[0]["name"] == "list_todos"
+    # The JSON text should NOT appear as the final response
+    done = [e for e in events if e["type"] == "done"][-1]
+    assert done["response"] == "Here are your todos"
+
+
+# --- _setup_env tests (LM Studio dummy key workaround) ---
+
+
+def _clear_litellm_keys() -> None:
+    for key in ("OPENAI_API_KEY", "ANTHROPIC_API_KEY", "OLLAMA_API_KEY"):
+        os.environ.pop(key, None)
+
+
+def test_setup_env_injects_dummy_key_for_local_openai_provider() -> None:
+    """When CHAT_MODEL is openai/* and no key is set, inject a dummy key."""
+    _clear_litellm_keys()
+    with patch.object(cs.settings, "openai_api_key", ""), patch.object(
+        cs.settings, "anthropic_api_key", ""
+    ), patch.object(cs.settings, "chat_api_base", "http://localhost:1234/v1"), patch.object(
+        cs.settings, "chat_model", "openai/qwen2.5-7b-instruct"
+    ):
+        cs._setup_env()
+    assert os.environ.get("OPENAI_API_KEY") == "lm-studio"
+
+
+def test_setup_env_injects_dummy_key_for_localhost_base() -> None:
+    """A localhost CHAT_API_BASE alone is enough to trigger the dummy key."""
+    _clear_litellm_keys()
+    with patch.object(cs.settings, "openai_api_key", ""), patch.object(
+        cs.settings, "anthropic_api_key", ""
+    ), patch.object(cs.settings, "chat_api_base", "http://127.0.0.1:1234/v1"), patch.object(
+        cs.settings, "chat_model", "custom-model"
+    ):
+        cs._setup_env()
+    assert os.environ.get("OPENAI_API_KEY") == "lm-studio"
+
+
+def test_setup_env_does_not_inject_when_remote() -> None:
+    """Remote API bases (no local host marker, no openai/ prefix) stay untouched."""
+    _clear_litellm_keys()
+    with patch.object(cs.settings, "openai_api_key", ""), patch.object(
+        cs.settings, "anthropic_api_key", ""
+    ), patch.object(cs.settings, "chat_api_base", "https://api.example.com/v1"), patch.object(
+        cs.settings, "chat_model", "custom-model"
+    ):
+        cs._setup_env()
+    assert "OPENAI_API_KEY" not in os.environ
+
+
+def test_setup_env_preserves_explicit_key() -> None:
+    """A user-supplied OPENAI_API_KEY (via settings.openai_api_key) wins."""
+    _clear_litellm_keys()
+    with patch.object(cs.settings, "openai_api_key", "sk-real-key"), patch.object(
+        cs.settings, "anthropic_api_key", ""
+    ), patch.object(cs.settings, "chat_api_base", ""), patch.object(
+        cs.settings, "chat_model", "gpt-4o"
+    ):
+        cs._setup_env()
+    assert os.environ.get("OPENAI_API_KEY") == "sk-real-key"
+
+
+def test_setup_env_sets_ollama_api_key() -> None:
+    """A user-supplied OLLAMA_API_KEY is exported for LiteLLM."""
+    _clear_litellm_keys()
+    with patch.object(cs.settings, "openai_api_key", ""), patch.object(
+        cs.settings, "anthropic_api_key", ""
+    ), patch.object(cs.settings, "ollama_api_key", "oc-sk-123"), patch.object(
+        cs.settings, "chat_model", "ollama/llama3.3"
+    ):
+        cs._setup_env()
+    assert os.environ.get("OLLAMA_API_KEY") == "oc-sk-123"

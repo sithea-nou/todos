@@ -33,6 +33,7 @@ Create a `.env` file at the project root (or set these in your shell):
 | `CHAT_MODEL` | `claude-sonnet-4-6` | LiteLLM model string (see [Chatbot](#chatbot)) |
 | `ANTHROPIC_API_KEY` | — | Required for Claude models |
 | `OPENAI_API_KEY` | — | Required for GPT models |
+| `OLLAMA_API_KEY` | — | Required for Ollama Cloud |
 | `CHAT_API_BASE` | — | Override base URL for local LLMs |
 
 ## REST API
@@ -45,15 +46,25 @@ Create a `.env` file at the project root (or set these in your shell):
 | GET | `/api/todos/{id}` | Get a todo |
 | PATCH | `/api/todos/{id}` | Partial update |
 | DELETE | `/api/todos/{id}` | Delete a todo |
-| POST | `/api/chat/` | Send a message to the AI chatbot |
+| POST | `/api/chat/` | Send a message to the AI chatbot (non-streaming) |
+| POST | `/api/chat/stream` | Send a message and stream the reply via SSE |
+| GET | `/api/chat/info` | Active provider, model, capability flags |
+| GET | `/api/chat/models` | Models exposed by the configured OpenAI-compatible server |
+| GET | `/api/chat/sessions` | List persisted chat sessions |
+| POST | `/api/chat/sessions` | Create a new chat session |
+| GET | `/api/chat/sessions/{id}` | Fetch a single chat session |
+| GET | `/api/chat/sessions/{id}/messages` | List messages for a session |
+| DELETE | `/api/chat/sessions/{id}` | Delete a session and its messages |
 
 Interactive docs at `/docs` (Swagger UI) and `/redoc` when the server is running.
 
 ## Chatbot
 
-The app includes an AI chatbot reachable via a floating widget in the UI and the `POST /api/chat/` endpoint. It is a full agent — it can list, create, update, and delete todos on your behalf.
+The app includes an AI chatbot reachable via a floating widget in the UI and the `/api/chat/*` endpoints. It is a full agent — it can list, create, update, and delete todos on your behalf.
 
-### Endpoint
+### Endpoints
+
+#### `POST /api/chat/` (non-streaming)
 
 ```
 POST /api/chat/
@@ -61,17 +72,50 @@ Content-Type: application/json
 
 {
   "message": "Add a todo to buy groceries",
-  "history": []          // optional: previous [{"role":"user","content":"..."},...]
+  "history": [],          // optional: previous [{"role":"user","content":"..."},...]
+  "session_id": "uuid"     // optional: persist the turn + reuse prior history
 }
 ```
 
 Response:
 
 ```json
-{ "response": "Done! I've added 'Buy groceries' to your list." }
+{ "response": "Done! I've added 'Buy groceries' to your list.", "session_id": "uuid" }
 ```
 
-The backend runs an agentic loop: it calls the LLM, executes any tool calls against the database, and loops until the model produces a final text reply.
+#### `POST /api/chat/stream` (SSE)
+
+Same request body. The response is a `text/event-stream` with frames:
+
+| Event | Payload | Notes |
+|---|---|---|
+| `start` | `{session_id, model, provider}` | First event |
+| `token` | `{delta}` | Incremental text from the model |
+| `tool` | `{name, arguments, result}` | A tool call the agent made |
+| `done` | `{response, session_id}` | Stream finished; the assistant reply is complete |
+| `error` | `{message}` | Stream aborted |
+
+#### `GET /api/chat/info`
+
+```json
+{
+  "provider": "lm-studio",
+  "model": "openai/qwen2.5-7b-instruct",
+  "api_base": "http://localhost:1234/v1",
+  "streaming": true,
+  "tool_use_supported": true
+}
+```
+
+#### `GET /api/chat/models`
+
+Proxies `{CHAT_API_BASE}/models` for OpenAI-compatible servers (LM Studio, vLLM, Ollama OpenAI shim, etc). Returns `available: false` with an `error` message for providers that don't expose a models endpoint (e.g. Anthropic).
+
+#### Chat sessions
+
+Create a session with `POST /api/chat/sessions` (body `{"title": "..."}`), then pass the returned `id` as `session_id` on chat calls. The backend will load prior messages on every turn and persist the new turn afterwards. The first user message auto-titles the session.
+
+The frontend widget manages sessions automatically — `session_id` is stored in `localStorage` and reused across messages, with a “+” button to start a new session.
 
 ### Switching providers
 
@@ -184,6 +228,34 @@ For any OpenAI-compatible server (LM Studio, vLLM, text-generation-webui, etc.):
 CHAT_MODEL=openai/my-model
 CHAT_API_BASE=http://localhost:1234/v1  # or your server's API endpoint
 ```
+
+**No API key is required for local servers.** The chat service detects when
+`CHAT_API_BASE` points at a local host (localhost, 127.0.0.1,
+`host.docker.internal`, `0.0.0.0`) or when `CHAT_MODEL` uses the
+`openai/` prefix, and automatically injects a dummy `OPENAI_API_KEY` so
+LiteLLM can dispatch the request. Local servers (LM Studio in particular)
+ignore the key, but LiteLLM refuses to send a request without one.
+
+If you need a real key, set `OPENAI_API_KEY=anything` in your `.env` —
+LM Studio will accept it as long as the value is non-empty.
+
+**LM Studio setup checklist:**
+1. Open LM Studio → *Developer* tab → start the local server
+   (default: `http://localhost:1234/v1`).
+2. Load a model that supports function/tool calling (e.g. Qwen 2.5, Llama 3.1
+   Instruct, Mistral Nemo, GLM-4). Smaller/older models won't follow the tool
+   protocol.
+3. In your `.env`:
+   ```bash
+   CHAT_MODEL=openai/<model-id-from-LM-Studio>
+   CHAT_API_BASE=http://localhost:1234/v1
+   ```
+   Use the model identifier LM Studio shows for the loaded model
+   (e.g. `openai/zai-org/glm-4.7-flash` or `openai/qwen2.5-7b-instruct`).
+
+If tool use is unreliable on your chosen model, the chat service falls back
+to parsing JSON tool calls from the model's text output (the same workaround
+used for Ollama).
 
 ## MCP Server
 

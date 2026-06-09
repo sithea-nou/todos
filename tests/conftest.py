@@ -11,6 +11,7 @@ from sqlmodel import delete
 import app.mcp_server
 from app.database import AsyncSession, async_session_factory
 from app.mcp_server import mcp
+from app.models.chat import ChatMessage, ChatSession
 from app.models.todo import Todo
 
 
@@ -33,9 +34,13 @@ async def session() -> AsyncGenerator:
     """Provide a test database session with auto-cleanup."""
     async with async_session_factory() as s:
         # Wipe any rows left by a prior failed/interrupted run before starting.
+        await s.execute(delete(ChatMessage))
+        await s.execute(delete(ChatSession))
         await s.execute(delete(Todo))
         await s.commit()
         yield s
+        await s.execute(delete(ChatMessage))
+        await s.execute(delete(ChatSession))
         await s.execute(delete(Todo))
         await s.commit()
 
@@ -47,9 +52,24 @@ async def client(session: AsyncSession) -> AsyncGenerator:
 
     app.dependency_overrides[async_session_factory] = lambda: session
 
-    transport = ASGITransport(app=app)
-    async with AsyncClient(transport=transport, base_url="http://test") as ac:
-        yield ac
+    # chat_service.chat / chat_service.chat_stream open their own sessions via
+    # the global factory — patch the factory in this module too so they
+    # reuse the test session.
+    import app.services.chat_service as cs_mod
+
+    original_cs_factory = cs_mod.async_session_factory
+
+    @asynccontextmanager
+    async def _cs_factory():
+        yield session
+
+    cs_mod.async_session_factory = _cs_factory  # type: ignore[assignment]
+    try:
+        transport = ASGITransport(app=app)
+        async with AsyncClient(transport=transport, base_url="http://test") as ac:
+            yield ac
+    finally:
+        cs_mod.async_session_factory = original_cs_factory  # type: ignore[assignment]
 
 
 @pytest_asyncio.fixture

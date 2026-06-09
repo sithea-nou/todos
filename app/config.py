@@ -17,6 +17,7 @@ class Settings(BaseSettings):
     secret_key: str = "change-me-in-production"
     anthropic_api_key: str = ""
     openai_api_key: str = ""
+    ollama_api_key: str = ""
     chat_model: str = "claude-sonnet-4-6"
     chat_api_base: str = ""  # override base URL for local LLMs (e.g. http://localhost:11434/v1)
 

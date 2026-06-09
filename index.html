@@ -318,13 +318,90 @@
                 display: flex;
                 align-items: center;
                 justify-content: space-between;
+                gap: 10px;
             }
 
-            .chat-header span {
+            .chat-header-title {
+                display: flex;
+                align-items: center;
+                gap: 10px;
+                flex: 1;
+                min-width: 0;
+            }
+
+            .chat-header-title > span {
                 color: #fff;
                 font-size: 0.95rem;
                 font-weight: 500;
                 letter-spacing: 0.5px;
+            }
+
+            .chat-provider {
+                display: inline-flex;
+                align-items: center;
+                gap: 6px;
+                padding: 3px 9px;
+                border-radius: 999px;
+                font-size: 0.7rem;
+                font-weight: 500;
+                background: rgba(139, 92, 246, 0.15);
+                color: #c4b5fd;
+                border: 1px solid rgba(139, 92, 246, 0.25);
+                max-width: 220px;
+                overflow: hidden;
+                text-overflow: ellipsis;
+                white-space: nowrap;
+            }
+
+            .chat-provider .dot {
+                width: 6px;
+                height: 6px;
+                border-radius: 50%;
+                background: #a78bfa;
+                flex-shrink: 0;
+            }
+
+            .chat-provider.streaming .dot {
+                background: #34d399;
+                box-shadow: 0 0 6px #34d399;
+            }
+
+            .chat-provider.tool-ok .dot { background: #34d399; }
+            .chat-provider.tool-warn .dot { background: #fbbf24; }
+
+            .chat-header-right {
+                display: flex;
+                gap: 4px;
+                align-items: center;
+            }
+
+            .chat-icon-btn {
+                background: none;
+                border: none;
+                color: rgba(255, 255, 255, 0.5);
+                font-size: 0.9rem;
+                cursor: pointer;
+                line-height: 1;
+                padding: 4px 6px;
+                border-radius: 6px;
+                transition: background 0.15s, color 0.15s;
+            }
+
+            .chat-icon-btn:hover {
+                background: rgba(255, 255, 255, 0.06);
+                color: #fff;
+            }
+
+            .chat-tool-event {
+                align-self: flex-start;
+                max-width: 82%;
+                padding: 6px 10px;
+                border-radius: 8px;
+                background: rgba(139, 92, 246, 0.1);
+                color: rgba(255, 255, 255, 0.55);
+                font-size: 0.72rem;
+                font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, monospace;
+                border: 1px solid rgba(139, 92, 246, 0.18);
             }
 
             .chat-close {
@@ -491,8 +568,29 @@
 
         <div class="chat-panel hidden" id="chatPanel">
             <div class="chat-header">
-                <span>AI Assistant</span>
-                <button class="chat-close" id="chatClose">✕</button>
+                <div class="chat-header-title">
+                    <span>AI Assistant</span>
+                    <span
+                        class="chat-provider"
+                        id="chatProvider"
+                        title="Loading provider info…"
+                    >
+                        <span class="dot"></span>
+                        <span id="chatProviderLabel">connecting…</span>
+                    </span>
+                </div>
+                <div class="chat-header-right">
+                    <button
+                        class="chat-icon-btn"
+                        id="chatNew"
+                        title="Start a new chat session"
+                    >
+                        ＋
+                    </button>
+                    <button class="chat-icon-btn" id="chatClose" title="Close">
+                        ✕
+                    </button>
+                </div>
             </div>
             <div class="chat-messages" id="chatMessages"></div>
             <div class="chat-input-row">
@@ -762,17 +860,26 @@
             const chatBubble = document.getElementById("chatBubble");
             const chatPanel = document.getElementById("chatPanel");
             const chatClose = document.getElementById("chatClose");
+            const chatNew = document.getElementById("chatNew");
             const chatMessages = document.getElementById("chatMessages");
             const chatInput = document.getElementById("chatInput");
             const chatSend = document.getElementById("chatSend");
+            const chatProvider = document.getElementById("chatProvider");
+            const chatProviderLabel = document.getElementById("chatProviderLabel");
 
             let chatHistory = [];
             let chatOpen = false;
+            let chatSessionId = localStorage.getItem("chatSessionId") || null;
+            let chatStreaming = false;
+            let chatInfo = null;
 
             chatBubble.addEventListener("click", () => {
                 chatOpen = !chatOpen;
                 chatPanel.classList.toggle("hidden", !chatOpen);
-                if (chatOpen) chatInput.focus();
+                if (chatOpen) {
+                    chatInput.focus();
+                    loadChatInfo();
+                }
             });
 
             chatClose.addEventListener("click", () => {
@@ -780,9 +887,41 @@
                 chatPanel.classList.add("hidden");
             });
 
+            function setProviderLabel(text, state) {
+                chatProviderLabel.textContent = text;
+                chatProvider.classList.remove("streaming", "tool-ok", "tool-warn");
+                if (state) chatProvider.classList.add(state);
+                chatProvider.title = chatInfo
+                    ? `${chatInfo.provider} · ${chatInfo.model}`
+                    : text;
+            }
+
+            async function loadChatInfo() {
+                try {
+                    const res = await fetch("/api/chat/info");
+                    if (!res.ok) throw new Error("info " + res.status);
+                    chatInfo = await res.json();
+                    const supportsTools = chatInfo.tool_use_supported;
+                    const label = `${chatInfo.provider} · ${chatInfo.model}`;
+                    setProviderLabel(label, supportsTools ? "tool-ok" : "tool-warn");
+                } catch (e) {
+                    chatInfo = null;
+                    setProviderLabel("offline", "tool-warn");
+                }
+            }
+
             function appendMessage(role, text) {
                 const div = document.createElement("div");
                 div.className = `chat-msg ${role}`;
+                div.textContent = text;
+                chatMessages.appendChild(div);
+                chatMessages.scrollTop = chatMessages.scrollHeight;
+                return div;
+            }
+
+            function appendToolEvent(text) {
+                const div = document.createElement("div");
+                div.className = "chat-tool-event";
                 div.textContent = text;
                 chatMessages.appendChild(div);
                 chatMessages.scrollTop = chatMessages.scrollHeight;
@@ -803,45 +942,228 @@
                 if (el) el.remove();
             }
 
+            async function ensureSession() {
+                if (chatSessionId) {
+                    const res = await fetch(`/api/chat/sessions/${chatSessionId}`);
+                    if (res.ok) return chatSessionId;
+                    // stale session
+                    chatSessionId = null;
+                    localStorage.removeItem("chatSessionId");
+                }
+                const res = await fetch("/api/chat/sessions", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ title: "New chat" }),
+                });
+                if (!res.ok) throw new Error("session " + res.status);
+                const session = await res.json();
+                chatSessionId = session.id;
+                localStorage.setItem("chatSessionId", chatSessionId);
+                return chatSessionId;
+            }
+
+            function resetSession() {
+                chatSessionId = null;
+                chatHistory = [];
+                localStorage.removeItem("chatSessionId");
+                chatMessages.innerHTML = "";
+            }
+
+            chatNew.addEventListener("click", async () => {
+                if (chatStreaming) return;
+                resetSession();
+                setProviderLabel(
+                    chatInfo
+                        ? `${chatInfo.provider} · ${chatInfo.model}`
+                        : "connecting…",
+                    chatInfo?.tool_use_supported ? "tool-ok" : "tool-warn"
+                );
+            });
+
+            function consumeSSE(body, onEvent) {
+                const reader = body.getReader();
+                const decoder = new TextDecoder();
+                let buffer = "";
+
+                const dispatch = (raw) => {
+                    // Parse one SSE event block (terminated by a blank line
+                    // per spec, but Uvicorn's StreamingResponse flushes each
+                    // frame after a single ``\n`` so we accept either).
+                    let event = "message";
+                    const dataLines = [];
+                    for (const line of raw.split("\n")) {
+                        if (!line || line.startsWith(":")) continue;
+                        const idx = line.indexOf(":");
+                        if (idx < 0) continue;
+                        const field = line.slice(0, idx);
+                        let value = line.slice(idx + 1);
+                        if (value.startsWith(" ")) value = value.slice(1);
+                        if (field === "event") event = value;
+                        else if (field === "data") dataLines.push(value);
+                    }
+                    if (!dataLines.length) return false;
+                    let parsed;
+                    try {
+                        parsed = JSON.parse(dataLines.join("\n"));
+                    } catch {
+                        return false;
+                    }
+                    parsed._event = event;
+                    return onEvent(parsed);
+                };
+
+                return (async () => {
+                    try {
+                        while (true) {
+                            const { value, done } = await reader.read();
+                            if (done) break;
+                            buffer += decoder.decode(value, { stream: true });
+
+                            // Split on either a blank line (spec-compliant
+                            // servers) or a single newline followed by an
+                            // ``event:`` field (Uvicorn's StreamingResponse
+                            // writes frames verbatim with only one ``\n``).
+                            // The last element is an incomplete tail — keep
+                            // it in the buffer.
+                            const frames = buffer.split(
+                                /\n\n|(?=\nevent:)/
+                            );
+                            buffer = frames.pop() || "";
+                            for (const ev of frames) {
+                                if (!ev.trim()) continue;
+                                const stop = await dispatch(ev);
+                                if (stop) {
+                                    try { await reader.cancel(); } catch (_) {}
+                                    return;
+                                }
+                            }
+                        }
+                        // Drain any trailing event after the stream ends.
+                        if (buffer.trim()) {
+                            await dispatch(buffer);
+                        }
+                    } finally {
+                        try { reader.releaseLock(); } catch (_) {}
+                    }
+                })();
+            }
+
             async function sendChat() {
                 const text = chatInput.value.trim();
-                if (!text) return;
+                if (!text || chatStreaming) return;
 
                 chatInput.value = "";
                 chatInput.style.height = "auto";
                 chatSend.disabled = true;
+                chatStreaming = true;
+                setProviderLabel(
+                    chatInfo
+                        ? `${chatInfo.provider} · ${chatInfo.model}`
+                        : "thinking…",
+                    "streaming"
+                );
 
                 appendMessage("user", text);
                 showThinking();
 
+                let sessionId;
                 try {
-                    const res = await fetch("/api/chat/", {
+                    sessionId = await ensureSession();
+                } catch (e) {
+                    removeThinking();
+                    chatStreaming = false;
+                    chatSend.disabled = false;
+                    setProviderLabel("session error", "tool-warn");
+                    appendMessage("assistant", "Could not start a chat session.");
+                    return;
+                }
+
+                let assistantEl = null;
+                let buffer = "";
+                let finalText = "";
+
+                try {
+                    const res = await fetch("/api/chat/stream", {
                         method: "POST",
                         headers: { "Content-Type": "application/json" },
-                        body: JSON.stringify({ message: text, history: chatHistory }),
+                        body: JSON.stringify({ message: text, session_id: sessionId }),
                     });
 
                     removeThinking();
 
-                    if (!res.ok) {
+                    if (!res.ok || !res.body) {
                         appendMessage("assistant", "Error: " + res.status);
                         return;
                     }
 
-                    const data = await res.json();
-                    appendMessage("assistant", data.response);
+                    await consumeSSE(res.body, (ev) => {
+                        if (ev._event === "token") {
+                            buffer += ev.content || ev.delta || "";
+                            if (!assistantEl) {
+                                assistantEl = appendMessage("assistant", "");
+                            }
+                            assistantEl.textContent = buffer;
+                            chatMessages.scrollTop = chatMessages.scrollHeight;
+                        } else if (ev._event === "tool") {
+                            // Any text streamed before a tool call is just preamble,
+                            // not the final answer. Clear it so the user doesn't see it.
+                            buffer = "";
+                            if (assistantEl) assistantEl.textContent = "";
+
+                            // Only show tool-call details for providers with native
+                            // tool support. For Ollama etc. the trace is noisy.
+                            if (chatInfo && chatInfo.tool_use_supported) {
+                                const name = ev.name || "tool";
+                                const args = ev.arguments
+                                    ? JSON.stringify(ev.arguments)
+                                    : "";
+                                appendToolEvent(`→ ${name}${args ? "  " + args : ""}`);
+                            }
+                        } else if (ev._event === "tool_result") {
+                            const name = ev.name || "tool";
+                            const snippet = (ev.content || "").slice(0, 80);
+                            appendToolEvent(`← ${name}  ${snippet}`);
+                        } else if (ev._event === "done") {
+                            finalText = ev.response != null ? ev.response : buffer;
+                        } else if (ev._event === "error") {
+                            appendMessage(
+                                "assistant",
+                                "Error: " + (ev.message || "unknown")
+                            );
+                            return true;
+                        }
+                        return false;
+                    });
+
+                    if (!finalText && buffer) finalText = buffer;
+                    if (assistantEl) {
+                        assistantEl.textContent = finalText;
+                    } else if (finalText) {
+                        appendMessage("assistant", finalText);
+                    } else {
+                        appendMessage(
+                            "assistant",
+                            "(no response from model)"
+                        );
+                    }
 
                     chatHistory.push({ role: "user", content: text });
-                    chatHistory.push({ role: "assistant", content: data.response });
+                    chatHistory.push({ role: "assistant", content: finalText });
 
-                    // Refresh todo list in case the agent modified todos
                     await fetchTodos();
                     render();
                 } catch (err) {
                     removeThinking();
                     appendMessage("assistant", "Network error. Please try again.");
                 } finally {
+                    chatStreaming = false;
                     chatSend.disabled = false;
+                    setProviderLabel(
+                        chatInfo
+                            ? `${chatInfo.provider} · ${chatInfo.model}`
+                            : "connecting…",
+                        chatInfo?.tool_use_supported ? "tool-ok" : "tool-warn"
+                    );
                     chatInput.focus();
                 }
             }
@@ -860,6 +1182,9 @@
                 chatInput.style.height = "auto";
                 chatInput.style.height = Math.min(chatInput.scrollHeight, 100) + "px";
             });
+
+            // Load provider info on page load
+            loadChatInfo();
         </script>
     </body>
 </html>

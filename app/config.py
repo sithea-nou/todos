@@ -12,8 +12,13 @@ class Settings(BaseSettings):
 
     app_name: str = "MyToDo"
     debug: bool = False
+    debug_logging: bool = False
     database_url: str = "sqlite+aiosqlite:///./todos.db"
     secret_key: str = "change-me-in-production"
+    anthropic_api_key: str = ""
+    openai_api_key: str = ""
+    chat_model: str = "claude-sonnet-4-6"
+    chat_api_base: str = ""  # override base URL for local LLMs (e.g. http://localhost:11434/v1)
 
     model_config = SettingsConfigDict(
         env_file=".env",

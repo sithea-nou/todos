@@ -1,5 +1,6 @@
 """FastAPI application entry point."""
 
+import logging
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 from pathlib import Path
@@ -11,7 +12,13 @@ from fastmcp.utilities.lifespan import combine_lifespans
 from app.config import settings
 from app.database import init_db
 from app.mcp_server import mcp
-from app.routers import todos
+from app.routers import chat, chat_sessions, todos
+
+# Configure logging based on DEBUG_LOGGING setting
+if settings.debug_logging:
+    logging.basicConfig(level=logging.DEBUG)
+else:
+    logging.basicConfig(level=logging.INFO)
 
 
 @asynccontextmanager
@@ -30,6 +37,8 @@ app = FastAPI(
 )
 
 app.include_router(todos.router, prefix="/api/todos", tags=["todos"])
+app.include_router(chat.router, prefix="/api/chat", tags=["chat"])
+app.include_router(chat_sessions.router, prefix="/api/chat", tags=["chat-sessions"])
 app.mount("/mcp", mcp_app)
 
 

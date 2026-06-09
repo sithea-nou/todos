@@ -6,7 +6,14 @@ services:
     ports:
       - "8000:8000"
     environment:
+      # Database — keep the container path; do not override with a local .env value
       - DATABASE_URL=sqlite+aiosqlite:////app/data/todos.db
+      # Chatbot — pulled from shell env or a .env file in this directory
+      - CHAT_MODEL=${CHAT_MODEL:-claude-sonnet-4-6}
+      - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY:-}
+      - OPENAI_API_KEY=${OPENAI_API_KEY:-}
+      - CHAT_API_BASE=${CHAT_API_BASE:-}
+      - DEBUG_LOGGING=${DEBUG_LOGGING:-false} 
     volumes:
       # Persist the SQLite DB across container restarts
       - todos-data:/app/data

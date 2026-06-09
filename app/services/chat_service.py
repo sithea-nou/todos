@@ -92,7 +92,8 @@ _SYSTEM = (
     "You are a helpful todo assistant. Use the available tools to manage the user's todos. "
     "Be concise and friendly. "
     "When you need to call a tool, output ONLY the required JSON with no other text. "
-    "After receiving tool results, answer the user directly without calling additional tools unless necessary."
+    "After receiving tool results, answer the user directly "
+    "without calling additional tools unless necessary."
 )
 
 _TOOLS: list[dict[str, Any]] = [
@@ -547,8 +548,11 @@ async def chat_stream(
                     for tc in ordered_tool_calls:
                         if not tc["function"].get("name") and parsed_idx < len(parsed_calls):
                             tc["function"]["name"] = parsed_calls[parsed_idx]["name"]
-                            if not tc["function"].get("arguments") or tc["function"]["arguments"] == "{}":
-                                tc["function"]["arguments"] = json.dumps(parsed_calls[parsed_idx]["arguments"])
+                            args = tc["function"].get("arguments", "")
+                            if not args or args == "{}":
+                                tc["function"]["arguments"] = json.dumps(
+                                    parsed_calls[parsed_idx]["arguments"]
+                                )
                             parsed_idx += 1
                     # If there are more parsed calls than existing entries, append them
                     while parsed_idx < len(parsed_calls):

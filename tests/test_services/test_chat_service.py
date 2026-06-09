@@ -273,11 +273,19 @@ async def test_chat_stream_emits_tool_event(patched_session: AsyncSession) -> No
     assert done["response"] == "Done"
 
 
-async def test_chat_stream_parses_ollama_json_in_text(patched_session: AsyncSession) -> None:
-    """Ollama (streaming) may emit tool calls as plain JSON text instead of native tool_calls deltas."""
+async def test_chat_stream_parses_ollama_json_in_text(
+    patched_session: AsyncSession,
+) -> None:
+    """Ollama (streaming) may emit tool calls as plain JSON text
+    instead of native tool_calls deltas."""
     # First iteration: model returns tool call as text token
     first_chunks = [
-        _FakeChunk(delta=_FakeDelta(content='{"name": "list_todos", "arguments": {}}'), finish_reason="stop"),
+        _FakeChunk(
+            delta=_FakeDelta(
+                content='{"name": "list_todos", "arguments": {}}'
+            ),
+            finish_reason="stop",
+        ),
     ]
     # Second iteration: model answers with tool results
     second_chunks = [

@@ -19,7 +19,9 @@ async def test_info_reports_anthropic_by_default(client: AsyncClient) -> None:
     assert resp.status_code == 200
     data = resp.json()
     assert data["model"] == settings.chat_model
-    assert data["provider"] in ("anthropic", "openai", "lm-studio", "ollama", "ollama-cloud", "unknown")
+    assert data["provider"] in (
+        "anthropic", "openai", "lm-studio", "ollama", "ollama-cloud", "unknown",
+    )
     assert data["streaming"] is True
     assert isinstance(data["tool_use_supported"], bool)
 

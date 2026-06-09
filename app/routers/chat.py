@@ -1,6 +1,7 @@
 """Chat router: streaming + non-streaming /api/chat/, /api/chat/info, /api/chat/models."""
 
 import json
+from collections.abc import AsyncGenerator
 from typing import Any
 from uuid import UUID
 
@@ -260,7 +261,7 @@ async def chat_stream(request: ChatRequest) -> StreamingResponse:
       - ``error`` : { message }
     """
 
-    async def event_gen():
+    async def event_gen() -> AsyncGenerator[str]:
         history = request.history
         if request.session_id is not None:
             from app.database import async_session_factory

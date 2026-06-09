@@ -38,7 +38,7 @@ def _to_read(msg: ChatMessage) -> ChatMessageRead:
 
 async def list_sessions(session: AsyncSession) -> list[ChatSessionRead]:
     """Return all chat sessions, most recently updated first."""
-    stmt = select(ChatSession).order_by(ChatSession.updated_at.desc())
+    stmt = select(ChatSession).order_by(ChatSession.updated_at.desc())  # type: ignore[attr-defined]
     result = await session.execute(stmt)
     sessions = result.scalars().all()
     return [ChatSessionRead(**s.model_dump()) for s in sessions]
@@ -84,7 +84,7 @@ async def list_messages(
     stmt = (
         select(ChatMessage)
         .where(ChatMessage.session_id == session_id)
-        .order_by(ChatMessage.created_at)
+        .order_by(ChatMessage.created_at)  # type: ignore[arg-type]
     )
     result = await session.execute(stmt)
     return [_to_read(m) for m in result.scalars().all()]

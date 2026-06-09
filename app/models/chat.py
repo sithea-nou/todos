@@ -1,6 +1,7 @@
 """SQLModel ORM models for chat sessions and messages."""
 
 from datetime import datetime
+from typing import Any
 from uuid import UUID, uuid4
 
 from sqlmodel import Field, SQLModel
@@ -59,6 +60,6 @@ class ChatMessageRead(SQLModel):
     session_id: UUID
     role: str
     content: str
-    tool_calls: list[dict] | None = None
+    tool_calls: list[dict[str, Any]] | None = None
     tool_call_id: str | None = None
     created_at: datetime

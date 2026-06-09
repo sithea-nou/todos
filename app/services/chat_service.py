@@ -25,35 +25,67 @@ logger = logging.getLogger(__name__)
 os.environ.setdefault("LITELLM_LOG", "DEBUG")
 
 
-def _try_parse_ollama_tool_call(text: str) -> dict[str, Any] | None:
-    """Best-effort parse of a tool call from a model's text output (Ollama fallback).
+def _try_parse_ollama_tool_calls(text: str) -> list[dict[str, Any]]:
+    """Best-effort parse of tool calls from a model's text output (Ollama fallback).
 
-    Returns ``{"name": str, "arguments": dict}`` or ``None`` if the text doesn't
-    look like a tool call.
+    Returns a list of ``{"name": str, "arguments": dict}`` dicts.
+    Handles three Ollama output patterns:
+
+    1. Single JSON object: ``{"name": "...", "arguments": {...}}``
+    2. JSON array: ``[{"name": "...", ...}, ...]``
+    3. Multiple JSON objects on separate lines (newline-delimited)
     """
     if not text:
-        return None
+        return []
     json_str = text
     if "```json" in json_str:
         try:
             json_str = json_str.split("```json", 1)[1].split("```", 1)[0].strip()
         except IndexError:
-            return None
+            return []
     elif "```" in json_str:
         try:
             json_str = json_str.split("```", 1)[1].split("```", 1)[0].strip()
         except IndexError:
-            return None
+            return []
+
+    # Try parsing as a single JSON value first (object or array)
     try:
         parsed = json.loads(json_str)
+        results: list[dict[str, Any]] = []
+        if isinstance(parsed, dict):
+            results.extend(_extract_tool_calls_from_dict(parsed))
+        elif isinstance(parsed, list):
+            for item in parsed:
+                if isinstance(item, dict):
+                    results.extend(_extract_tool_calls_from_dict(item))
+        return results
     except json.JSONDecodeError:
-        return None
-    if not isinstance(parsed, dict) or "name" not in parsed:
-        return None
+        pass
+
+    # Fall back to newline-delimited JSON objects
+    results = []
+    for line in json_str.splitlines():
+        line = line.strip()
+        if not line:
+            continue
+        try:
+            parsed = json.loads(line)
+            if isinstance(parsed, dict):
+                results.extend(_extract_tool_calls_from_dict(parsed))
+        except json.JSONDecodeError:
+            continue
+    return results
+
+
+def _extract_tool_calls_from_dict(parsed: dict[str, Any]) -> list[dict[str, Any]]:
+    """Extract tool call dicts from a parsed JSON object."""
+    if "name" not in parsed:
+        return []
     args = parsed.get("arguments") or {}
     if not isinstance(args, dict):
         args = {}
-    return {"name": str(parsed["name"]), "arguments": args}
+    return [{"name": str(parsed["name"]), "arguments": args}]
 
 
 _SYSTEM = (
@@ -306,27 +338,20 @@ async def _agentic_loop(
 
             # Ollama workaround: parse JSON tool calls from text (e.g., inside ```json blocks)
             if response_text and not msg.tool_calls:
-                try:
-                    json_str = response_text
-                    if "```json" in json_str:
-                        json_str = json_str.split("```json")[1].split("```")[0].strip()
-                    elif "```" in json_str:
-                        json_str = json_str.split("```")[1].split("```")[0].strip()
-
-                    parsed = json.loads(json_str)
-                    if isinstance(parsed, dict) and "name" in parsed and "arguments" in parsed:
-                        tool_call = type('ToolCall', (), {
-                            'id': 'ollama_tool_call',
+                parsed_calls = _try_parse_ollama_tool_calls(response_text)
+                if parsed_calls:
+                    msg.tool_calls = [
+                        type('ToolCall', (), {
+                            'id': f'ollama_tool_call_{i}',
                             'function': type('Function', (), {
-                                'name': parsed["name"],
-                                'arguments': json.dumps(parsed["arguments"])
+                                'name': tc["name"],
+                                'arguments': json.dumps(tc["arguments"])
                             })()
                         })()
-                        msg.tool_calls = [tool_call]
-                        msg.content = ""  # strip preamble text
-                        finish_reason = "tool_calls"
-                except (json.JSONDecodeError, KeyError, IndexError):
-                    pass  # Not a tool call, proceed normally
+                        for i, tc in enumerate(parsed_calls)
+                    ]
+                    msg.content = ""  # strip preamble text
+                    finish_reason = "tool_calls"
 
             if finish_reason not in ("tool_calls", "function_call"):
                 if not response_text:
@@ -447,7 +472,7 @@ async def chat_stream(
                     content_parts.append(text_piece)
                     # Suppress visible token if the text is a JSON tool call
                     # emitted by Ollama (which lacks native streaming tool_calls).
-                    if _try_parse_ollama_tool_call(text_piece) is None:
+                    if not _try_parse_ollama_tool_calls(text_piece):
                         yield {"type": "token", "delta": text_piece}
                 # Tool call deltas: aggregate by index
                 tc_deltas = getattr(delta, "tool_calls", None)
@@ -484,19 +509,20 @@ async def chat_stream(
         intermediate: list[dict[str, Any]] = []
 
         # Ollama streaming workaround: when no native tool_calls were received,
-        # the model may have emitted the tool call as plain JSON text.
+        # the model may have emitted tool calls as plain JSON text.
         if not ordered_tool_calls and full_text:
-            parsed_tool = _try_parse_ollama_tool_call(full_text)
-            if parsed_tool is not None:
+            parsed_calls = _try_parse_ollama_tool_calls(full_text)
+            if parsed_calls:
                 ordered_tool_calls = [
                     {
-                        "id": "ollama_tool_call",
+                        "id": f"ollama_tool_call_{i}",
                         "type": "function",
                         "function": {
-                            "name": parsed_tool["name"],
-                            "arguments": json.dumps(parsed_tool["arguments"]),
+                            "name": tc["name"],
+                            "arguments": json.dumps(tc["arguments"]),
                         },
                     }
+                    for i, tc in enumerate(parsed_calls)
                 ]
                 full_text = ""
 
@@ -514,18 +540,28 @@ async def chat_stream(
                         tc["function"]["arguments"] = json.dumps(parsed_args)
             # If still no name, try the Ollama JSON-in-text fallback
             if not ordered_tool_calls[0]["function"].get("name") and full_text:
-                parsed_tool = _try_parse_ollama_tool_call(full_text)
-                if parsed_tool is not None:
-                    ordered_tool_calls = [
-                        {
-                            "id": "ollama_tool_call",
+                parsed_calls = _try_parse_ollama_tool_calls(full_text)
+                if parsed_calls:
+                    # Fill in names on existing entries or append new ones
+                    parsed_idx = 0
+                    for tc in ordered_tool_calls:
+                        if not tc["function"].get("name") and parsed_idx < len(parsed_calls):
+                            tc["function"]["name"] = parsed_calls[parsed_idx]["name"]
+                            if not tc["function"].get("arguments") or tc["function"]["arguments"] == "{}":
+                                tc["function"]["arguments"] = json.dumps(parsed_calls[parsed_idx]["arguments"])
+                            parsed_idx += 1
+                    # If there are more parsed calls than existing entries, append them
+                    while parsed_idx < len(parsed_calls):
+                        pc = parsed_calls[parsed_idx]
+                        ordered_tool_calls.append({
+                            "id": f"ollama_tool_call_{parsed_idx}",
                             "type": "function",
                             "function": {
-                                "name": parsed_tool["name"],
-                                "arguments": json.dumps(parsed_tool["arguments"]),
+                                "name": pc["name"],
+                                "arguments": json.dumps(pc["arguments"]),
                             },
-                        }
-                    ]
+                        })
+                        parsed_idx += 1
                     full_text = ""
 
             if ordered_tool_calls[0]["function"].get("name"):

@@ -16,11 +16,11 @@ from app.services import todo_service
 
 
 @pytest_asyncio.fixture
-async def patched_session(session: AsyncSession) -> AsyncGenerator[AsyncSession, None]:
+async def patched_session(session: AsyncSession) -> AsyncGenerator[AsyncSession]:
     """Patch chat_service to use the test DB session."""
 
     @asynccontextmanager
-    async def _factory() -> AsyncGenerator[AsyncSession, None]:
+    async def _factory() -> AsyncGenerator[AsyncSession]:
         yield session
 
     original = cs.async_session_factory

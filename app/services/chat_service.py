@@ -133,7 +133,8 @@ async def _run_tool(name: str, tool_input: dict[str, Any]) -> str:
         if name == "list_todos":
             completed = tool_input.get("completed")
             if completed is not None and not isinstance(completed, bool):
-                return f"Invalid completed value: expected boolean or null, got {type(completed).__name__}"
+                type_name = type(completed).__name__
+                return f"Invalid completed value: expected boolean or null, got {type_name}"
             todos = await todo_service.list_todos(session, completed=completed)
             return json.dumps([t.model_dump(mode="json") for t in todos])
 
@@ -141,7 +142,7 @@ async def _run_tool(name: str, tool_input: dict[str, Any]) -> str:
             try:
                 todo = await todo_service.get_todo(session, UUID(tool_input["todo_id"]))
             except (ValueError, KeyError) as e:
-                return f"Invalid todo_id: {str(e)}"
+                return f"Invalid todo_id: {e!s}"
             if todo is None:
                 return f"Todo {tool_input['todo_id']} not found"
             return json.dumps(todo.model_dump(mode="json"))
@@ -158,7 +159,7 @@ async def _run_tool(name: str, tool_input: dict[str, Any]) -> str:
             try:
                 todo_id = UUID(tool_input["todo_id"])
             except (ValueError, KeyError) as e:
-                return f"Invalid todo_id: {str(e)}"
+                return f"Invalid todo_id: {e!s}"
             changes: dict[str, Any] = {}
             if "title" in tool_input and tool_input["title"] is not None:
                 changes["title"] = tool_input["title"]
@@ -167,7 +168,8 @@ async def _run_tool(name: str, tool_input: dict[str, Any]) -> str:
             if "is_completed" in tool_input and tool_input["is_completed"] is not None:
                 is_completed = tool_input["is_completed"]
                 if not isinstance(is_completed, bool):
-                    return f"Invalid is_completed value: expected boolean, got {type(is_completed).__name__}"
+                    type_name = type(is_completed).__name__
+                    return f"Invalid is_completed value: expected boolean, got {type_name}"
                 changes["is_completed"] = is_completed
             todo = await todo_service.update_todo(session, todo_id, TodoUpdate(**changes))
             if todo is None:
@@ -178,7 +180,7 @@ async def _run_tool(name: str, tool_input: dict[str, Any]) -> str:
             try:
                 deleted = await todo_service.delete_todo(session, UUID(tool_input["todo_id"]))
             except (ValueError, KeyError) as e:
-                return f"Invalid todo_id: {str(e)}"
+                return f"Invalid todo_id: {e!s}"
             if deleted:
                 return f"Deleted todo {tool_input['todo_id']}"
             return f"Todo {tool_input['todo_id']} not found"
@@ -226,7 +228,10 @@ async def chat(message: str, history: list[dict[str, Any]]) -> str:
         finish_reason: str = choice.finish_reason or "stop"
         msg = choice.message
 
-        logger.debug(f"LLM response: finish_reason={finish_reason}, tool_calls={msg.tool_calls}, content={msg.content}")
+        logger.debug(
+            f"LLM response: finish_reason={finish_reason}, "
+            f"tool_calls={msg.tool_calls}, content={msg.content}"
+        )
         logger.debug(f"Full response object: {response}")
 
         if finish_reason not in ("tool_calls", "function_call"):
@@ -260,7 +265,10 @@ async def chat(message: str, history: list[dict[str, Any]]) -> str:
 
             if finish_reason not in ("tool_calls", "function_call"):
                 if not response_text:
-                    logger.warning(f"Empty response from model. Finish reason: {finish_reason}, Tool calls: {msg.tool_calls}")
+                    logger.warning(
+                        f"Empty response from model. Finish reason: {finish_reason}, "
+                        f"Tool calls: {msg.tool_calls}"
+                    )
                 return response_text
 
         tool_calls = msg.tool_calls or []

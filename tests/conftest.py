@@ -48,28 +48,25 @@ async def session() -> AsyncGenerator:
 @pytest_asyncio.fixture
 async def client(session: AsyncSession) -> AsyncGenerator:
     """Provide an async test client bound to the test session."""
-    from app.main import app
+    from app.main import app as fastapi_app
 
-    app.dependency_overrides[async_session_factory] = lambda: session
+    fastapi_app.dependency_overrides[async_session_factory] = lambda: session
 
-    # chat_service.chat / chat_service.chat_stream open their own sessions via
-    # the global factory — patch the factory in this module too so they
-    # reuse the test session.
-    import app.services.chat_service as cs_mod
-
-    original_cs_factory = cs_mod.async_session_factory
+    # Chat service routes tool execution through the MCP server, so we patch
+    # the MCP server's session factory (same approach as the mcp_client fixture).
+    original_mcp_factory = app.mcp_server.async_session_factory
 
     @asynccontextmanager
     async def _cs_factory():
         yield session
 
-    cs_mod.async_session_factory = _cs_factory  # type: ignore[assignment]
+    app.mcp_server.async_session_factory = _cs_factory  # type: ignore[assignment]
     try:
-        transport = ASGITransport(app=app)
+        transport = ASGITransport(app=fastapi_app)
         async with AsyncClient(transport=transport, base_url="http://test") as ac:
             yield ac
     finally:
-        cs_mod.async_session_factory = original_cs_factory  # type: ignore[assignment]
+        app.mcp_server.async_session_factory = original_mcp_factory  # type: ignore[assignment]
 
 
 @pytest_asyncio.fixture

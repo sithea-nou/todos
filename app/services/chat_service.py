@@ -6,23 +6,142 @@ Supports any provider via LiteLLM:
   - Ollama     → CHAT_MODEL=ollama/llama3.1       (CHAT_API_BASE defaults to localhost)
   - Any OpenAI-compatible server:
                  CHAT_MODEL=openai/my-model        + CHAT_API_BASE=http://host:port/v1
+
+Tool definitions and execution are routed through the MCP server (``app.mcp_server``),
+which is the single source of truth. The OpenAI-format tool schemas used by the LLM
+are derived from the MCP server's registered tools at call time.
 """
 
 import json
 import logging
 import os
 from typing import Any
-from uuid import UUID
 
 import litellm
+from fastmcp import Client
+from fastmcp.exceptions import ToolError
 
 from app.config import settings
-from app.database import async_session_factory
-from app.models.todo import TodoCreate, TodoUpdate
-from app.services import todo_service
+from app.mcp_server import mcp
 
 logger = logging.getLogger(__name__)
 os.environ.setdefault("LITELLM_LOG", "DEBUG")
+
+# ---------------------------------------------------------------------------
+# MCP → OpenAI tool schema conversion
+# ---------------------------------------------------------------------------
+
+_cached_openai_tools: list[dict[str, Any]] | None = None
+
+
+def _flatten_anyof(schema: dict[str, Any]) -> dict[str, Any]:
+    """Convert ``anyOf[X, null]`` patterns to a simple type.
+
+    OpenAI function calling doesn't support ``anyOf``. Optional fields
+    expressed as ``anyOf`` with a null alternative are flattened to the
+    non-null type; optionality is conveyed by omitting the field from
+    ``required``.
+    """
+    if "anyOf" not in schema:
+        return schema
+    non_null = [s for s in schema["anyOf"] if s.get("type") != "null"]
+    if len(non_null) == 1:
+        result = {**non_null[0]}
+        if "description" in schema:
+            result["description"] = schema["description"]
+        if "default" in schema:
+            result["default"] = schema["default"]
+        return result
+    # Fallback: keep anyOf as-is (unusual for our tools)
+    return schema
+
+
+def _mcp_schema_to_openai(input_schema: dict[str, Any]) -> dict[str, Any]:
+    """Convert an MCP tool ``inputSchema`` to OpenAI function-calling format.
+
+    - Strips ``additionalProperties: false`` (not used by OpenAI).
+    - Flattens ``anyOf[X, null]`` → ``type: X`` for optional params.
+    - Preserves ``required`` list (fields not in it are optional).
+    - Flattens ``items: {additionalProperties: true, type: object}``
+      → ``items: {type: object}``.
+    """
+    props = input_schema.get("properties", {})
+    converted: dict[str, Any] = {}
+    for name, prop in props.items():
+        prop = {k: v for k, v in prop.items() if k != "additionalProperties"}
+        prop = _flatten_anyof(prop)
+        # Recurse into items for array types
+        if prop.get("type") == "array" and "items" in prop:
+            items = {k: v for k, v in prop["items"].items() if k != "additionalProperties"}
+            items = _flatten_anyof(items)
+            prop["items"] = items
+        converted[name] = prop
+    result: dict[str, Any] = {"type": "object", "properties": converted}
+    if "required" in input_schema:
+        result["required"] = input_schema["required"]
+    return result
+
+
+async def _build_openai_tools() -> list[dict[str, Any]]:
+    """Build OpenAI-format tool definitions from the MCP server.
+
+    Caches the result after the first call; tools are static once registered.
+    """
+    global _cached_openai_tools
+    if _cached_openai_tools is not None:
+        return _cached_openai_tools
+
+    async with Client(mcp) as client:
+        mcp_tools = await client.list_tools()
+
+    openai_tools: list[dict[str, Any]] = []
+    for t in mcp_tools:
+        openai_tools.append(
+            {
+                "type": "function",
+                "function": {
+                    "name": t.name,
+                    "description": t.description,
+                    "parameters": _mcp_schema_to_openai(t.inputSchema),
+                },
+            }
+        )
+
+    _cached_openai_tools = openai_tools
+    return openai_tools
+
+
+# ---------------------------------------------------------------------------
+# Tool execution via MCP
+# ---------------------------------------------------------------------------
+
+
+async def _run_tool_via_mcp(name: str, tool_input: dict[str, Any]) -> str:
+    """Execute a tool through the MCP server and return a JSON string result.
+
+    On success, returns ``json.dumps(result.data)``.
+    On ``ToolError`` (e.g. todo not found), returns the error message string.
+    """
+    try:
+        async with Client(mcp) as client:
+            result = await client.call_tool(name, tool_input)
+    except ToolError as exc:
+        return str(exc)
+    except Exception as exc:
+        logger.error(f"MCP call_tool error for {name}: {exc}")
+        return f"Error executing {name}: {str(exc)[:200]}"
+
+    data = result.data
+    if isinstance(data, list):
+        return json.dumps(data)
+    if isinstance(data, dict):
+        return json.dumps(data)
+    return str(data)
+
+
+# ---------------------------------------------------------------------------
+# Ollama JSON tool-call parser (fallback for models without native tool use)
+# ---------------------------------------------------------------------------
 
 
 def _try_parse_ollama_tool_calls(text: str) -> list[dict[str, Any]]:
@@ -88,100 +207,26 @@ def _extract_tool_calls_from_dict(parsed: dict[str, Any]) -> list[dict[str, Any]
     return [{"name": str(parsed["name"]), "arguments": args}]
 
 
+# ---------------------------------------------------------------------------
+# System prompt
+# ---------------------------------------------------------------------------
+
 _SYSTEM = (
     "You are a helpful todo assistant. Use the available tools to manage the user's todos. "
     "Be concise and friendly. "
+    "You can create, update, and delete todos; set priorities and due dates; reorder items; "
+    "and clear completed todos. "
+    "IMPORTANT: Only set priority and due_date when the user explicitly asks for them. "
+    "Do NOT assign a default priority or due date if the user doesn't mention it. "
     "When you need to call a tool, output ONLY the required JSON with no other text. "
     "After receiving tool results, answer the user directly "
     "without calling additional tools unless necessary."
 )
 
-_TOOLS: list[dict[str, Any]] = [
-    {
-        "type": "function",
-        "function": {
-            "name": "list_todos",
-            "description": "List all todos. Optionally filter by completion status.",
-            "parameters": {
-                "type": "object",
-                "properties": {
-                    "completed": {
-                        "type": "boolean",
-                        "description": "True for completed, False for active, omit for all.",
-                    }
-                },
-            },
-        },
-    },
-    {
-        "type": "function",
-        "function": {
-            "name": "get_todo",
-            "description": "Fetch a single todo by its UUID.",
-            "parameters": {
-                "type": "object",
-                "properties": {
-                    "todo_id": {"type": "string", "description": "UUID of the todo."}
-                },
-                "required": ["todo_id"],
-            },
-        },
-    },
-    {
-        "type": "function",
-        "function": {
-            "name": "create_todo",
-            "description": "Create a new todo.",
-            "parameters": {
-                "type": "object",
-                "properties": {
-                    "title": {"type": "string", "description": "Short title."},
-                    "description": {"type": "string", "description": "Optional description."},
-                },
-                "required": ["title"],
-            },
-        },
-    },
-    {
-        "type": "function",
-        "function": {
-            "name": "update_todo",
-            "description": "Update an existing todo. Only provided fields change.",
-            "parameters": {
-                "type": "object",
-                "properties": {
-                    "todo_id": {"type": "string", "description": "UUID of the todo."},
-                    "title": {"type": "string", "description": "New title."},
-                    "description": {"type": "string", "description": "New description."},
-                    "is_completed": {"type": "boolean", "description": "New completion flag."},
-                },
-                "required": ["todo_id"],
-            },
-        },
-    },
-    {
-        "type": "function",
-        "function": {
-            "name": "delete_todo",
-            "description": "Delete a todo by its UUID.",
-            "parameters": {
-                "type": "object",
-                "properties": {
-                    "todo_id": {"type": "string", "description": "UUID of the todo."}
-                },
-                "required": ["todo_id"],
-            },
-        },
-    },
-    {
-        "type": "function",
-        "function": {
-            "name": "clear_completed",
-            "description": "Delete all completed todos.",
-            "parameters": {"type": "object", "properties": {}},
-        },
-    },
-]
+
+# ---------------------------------------------------------------------------
+# Environment setup
+# ---------------------------------------------------------------------------
 
 
 def _setup_env() -> None:
@@ -216,73 +261,9 @@ def _is_ollama_cloud() -> bool:
     return model.startswith("ollama/") and ("ollama.com" in base or "api.ollama.com" in base)
 
 
-async def _run_tool(name: str, tool_input: dict[str, Any]) -> str:
-    """Execute a todo tool and return a JSON string result."""
-    async with async_session_factory() as session:
-        if name == "list_todos":
-            completed = tool_input.get("completed")
-            if completed is not None and not isinstance(completed, bool):
-                type_name = type(completed).__name__
-                return f"Invalid completed value: expected boolean or null, got {type_name}"
-            todos = await todo_service.list_todos(session, completed=completed)
-            return json.dumps([t.model_dump(mode="json") for t in todos])
-
-        if name == "get_todo":
-            try:
-                todo = await todo_service.get_todo(session, UUID(tool_input["todo_id"]))
-            except (ValueError, KeyError) as e:
-                return f"Invalid todo_id: {e!s}"
-            if todo is None:
-                return f"Todo {tool_input['todo_id']} not found"
-            return json.dumps(todo.model_dump(mode="json"))
-
-        if name == "create_todo":
-            payload = TodoCreate(
-                title=tool_input["title"],
-                description=tool_input.get("description"),
-            )
-            todo = await todo_service.create_todo(session, payload)
-            return json.dumps(todo.model_dump(mode="json"))
-
-        if name == "update_todo":
-            try:
-                todo_id = UUID(tool_input["todo_id"])
-            except (ValueError, KeyError) as e:
-                return f"Invalid todo_id: {e!s}"
-            changes: dict[str, Any] = {}
-            if "title" in tool_input and tool_input["title"] is not None:
-                changes["title"] = tool_input["title"]
-            if "description" in tool_input and tool_input["description"] is not None:
-                changes["description"] = tool_input["description"]
-            if "is_completed" in tool_input and tool_input["is_completed"] is not None:
-                is_completed = tool_input["is_completed"]
-                if not isinstance(is_completed, bool):
-                    type_name = type(is_completed).__name__
-                    return f"Invalid is_completed value: expected boolean, got {type_name}"
-                changes["is_completed"] = is_completed
-            todo = await todo_service.update_todo(session, todo_id, TodoUpdate(**changes))
-            if todo is None:
-                return f"Todo {tool_input['todo_id']} not found"
-            return json.dumps(todo.model_dump(mode="json"))
-
-        if name == "delete_todo":
-            try:
-                deleted = await todo_service.delete_todo(session, UUID(tool_input["todo_id"]))
-            except (ValueError, KeyError) as e:
-                return f"Invalid todo_id: {e!s}"
-            if deleted:
-                return f"Deleted todo {tool_input['todo_id']}"
-            return f"Todo {tool_input['todo_id']} not found"
-
-        if name == "clear_completed":
-            completed_todos = await todo_service.list_todos(session, completed=True)
-            count = 0
-            for t in completed_todos:
-                if await todo_service.delete_todo(session, t.id):
-                    count += 1
-            return f"Cleared {count} completed todo{'s' if count != 1 else ''}"
-
-    return f"Unknown tool: {name}"
+# ---------------------------------------------------------------------------
+# Agentic loop (non-streaming)
+# ---------------------------------------------------------------------------
 
 
 async def _agentic_loop(
@@ -297,13 +278,15 @@ async def _agentic_loop(
     list of dicts shaped like the OpenAI chat-completions messages
     (assistant tool_calls + tool results) for later persistence.
     """
+    tools = await _build_openai_tools()
+
     if not messages or messages[0].get("role") != "system":
         messages.insert(0, {"role": "system", "content": _SYSTEM})
 
     call_kwargs: dict[str, Any] = {
         "model": settings.chat_model,
         "messages": messages,
-        "tools": _TOOLS,
+        "tools": tools,
         "max_tokens": 4096,
     }
     if settings.chat_api_base:
@@ -385,7 +368,7 @@ async def _agentic_loop(
 
         for tc in tool_calls:
             tool_args = json.loads(tc.function.arguments)
-            result = await _run_tool(tc.function.name, tool_args)
+            result = await _run_tool_via_mcp(tc.function.name, tool_args)
             logger.debug(f"Tool execution: {tc.function.name}({tool_args}) -> {result}")
             tool_msg = {"role": "tool", "tool_call_id": tc.id, "content": result}
             messages.append(tool_msg)
@@ -412,6 +395,11 @@ async def _agentic_loop(
     )
 
 
+# ---------------------------------------------------------------------------
+# Streaming chat
+# ---------------------------------------------------------------------------
+
+
 async def chat(message: str, history: list[dict[str, Any]]) -> tuple[str, list[dict[str, Any]]]:
     """Run a chat turn. Returns ``(final_text, intermediate_turns_for_persistence)``."""
     _setup_env()
@@ -421,7 +409,8 @@ async def chat(message: str, history: list[dict[str, Any]]) -> tuple[str, list[d
 
 
 async def chat_stream(
-    message: str, history: list[dict[str, Any]]
+    message: str,
+    history: list[dict[str, Any]],
 ) -> Any:
     """Async generator yielding SSE-style event dicts:
       - {"type": "token", "delta": str}     — text delta from the model
@@ -430,6 +419,7 @@ async def chat_stream(
       - {"type": "error", "message": str}    — any failure
     """
     _setup_env()
+    tools = await _build_openai_tools()
     messages: list[Any] = list(history)
     if not messages or messages[0].get("role") != "system":
         messages.insert(0, {"role": "system", "content": _SYSTEM})
@@ -438,7 +428,7 @@ async def chat_stream(
     call_kwargs: dict[str, Any] = {
         "model": settings.chat_model,
         "messages": messages,
-        "tools": _TOOLS,
+        "tools": tools,
         "max_tokens": 4096,
         "stream": True,
     }
@@ -582,7 +572,7 @@ async def chat_stream(
                         tool_args = json.loads(tc["function"]["arguments"] or "{}")
                     except json.JSONDecodeError:
                         tool_args = {}
-                    result = await _run_tool(tc["function"]["name"], tool_args)
+                    result = await _run_tool_via_mcp(tc["function"]["name"], tool_args)
                     tool_msg = {
                         "role": "tool",
                         "tool_call_id": tc["id"],

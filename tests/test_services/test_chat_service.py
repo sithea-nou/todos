@@ -1,4 +1,8 @@
-"""Tests for the chat_service layer."""
+"""Tests for the chat_service layer.
+
+Tool execution now routes through the MCP server, so these tests
+verify the same operations via ``_run_tool_via_mcp``.
+"""
 
 import json
 import os
@@ -11,6 +15,7 @@ from uuid import uuid4
 import pytest_asyncio
 from sqlalchemy.ext.asyncio import AsyncSession
 
+import app.mcp_server
 import app.services.chat_service as cs
 from app.models.todo import TodoCreate
 from app.services import todo_service
@@ -18,69 +23,93 @@ from app.services import todo_service
 
 @pytest_asyncio.fixture
 async def patched_session(session: AsyncSession) -> AsyncGenerator[AsyncSession]:
-    """Patch chat_service to use the test DB session."""
+    """Patch MCP server's session factory so _run_tool_via_mcp uses the test DB."""
 
     @asynccontextmanager
     async def _factory() -> AsyncGenerator[AsyncSession]:
         yield session
 
-    original = cs.async_session_factory
-    cs.async_session_factory = _factory  # type: ignore[assignment]
+    original = app.mcp_server.async_session_factory
+    app.mcp_server.async_session_factory = _factory  # type: ignore[assignment]
+    # Reset the cached OpenAI tools so tests pick up the MCP server fresh
+    cs._cached_openai_tools = None
     yield session
-    cs.async_session_factory = original  # type: ignore[assignment]
+    app.mcp_server.async_session_factory = original  # type: ignore[assignment]
 
 
-# --- _run_tool tests ---
+# --- _run_tool_via_mcp tests ---
 
 
 async def test_run_tool_list_todos_empty(patched_session: AsyncSession) -> None:
-    result = await cs._run_tool("list_todos", {})
+    result = await cs._run_tool_via_mcp("list_todos", {})
     assert json.loads(result) == []
 
 
 async def test_run_tool_list_todos(patched_session: AsyncSession) -> None:
     await todo_service.create_todo(patched_session, TodoCreate(title="A"))
     await todo_service.create_todo(patched_session, TodoCreate(title="B"))
-    result = await cs._run_tool("list_todos", {})
+    result = await cs._run_tool_via_mcp("list_todos", {})
     assert len(json.loads(result)) == 2
 
 
 async def test_run_tool_list_todos_filter_completed(patched_session: AsyncSession) -> None:
     await todo_service.create_todo(patched_session, TodoCreate(title="Active"))
     await todo_service.create_todo(patched_session, TodoCreate(title="Done", is_completed=True))
-    result = await cs._run_tool("list_todos", {"completed": True})
+    result = await cs._run_tool_via_mcp("list_todos", {"completed": True})
     todos = json.loads(result)
     assert len(todos) == 1
     assert todos[0]["title"] == "Done"
 
 
+async def test_run_tool_list_todos_order_by(patched_session: AsyncSession) -> None:
+    await todo_service.create_todo(patched_session, TodoCreate(title="Low", priority=1))
+    await todo_service.create_todo(patched_session, TodoCreate(title="High", priority=3))
+    result = await cs._run_tool_via_mcp("list_todos", {"order_by": "priority"})
+    todos = json.loads(result)
+    assert len(todos) == 2
+    assert todos[0]["priority"] >= todos[1]["priority"]
+
+
 async def test_run_tool_create_todo(patched_session: AsyncSession) -> None:
-    result = await cs._run_tool("create_todo", {"title": "New task", "description": "Details"})
+    result = await cs._run_tool_via_mcp(
+        "create_todo", {"title": "New task", "description": "Details"}
+    )
     data = json.loads(result)
     assert data["title"] == "New task"
     assert data["description"] == "Details"
     assert data["is_completed"] is False
 
 
+async def test_run_tool_create_todo_with_priority_and_due_date(
+    patched_session: AsyncSession,
+) -> None:
+    result = await cs._run_tool_via_mcp(
+        "create_todo", {"title": "Important", "priority": 3, "due_date": "2026-07-15"}
+    )
+    data = json.loads(result)
+    assert data["priority"] == 3
+    assert data["due_date"] == "2026-07-15"
+
+
 async def test_run_tool_get_todo(patched_session: AsyncSession) -> None:
     created = await todo_service.create_todo(patched_session, TodoCreate(title="Find me"))
-    result = await cs._run_tool("get_todo", {"todo_id": str(created.id)})
+    result = await cs._run_tool_via_mcp("get_todo", {"todo_id": str(created.id)})
     assert json.loads(result)["title"] == "Find me"
 
 
 async def test_run_tool_get_todo_not_found(patched_session: AsyncSession) -> None:
-    result = await cs._run_tool("get_todo", {"todo_id": str(uuid4())})
+    result = await cs._run_tool_via_mcp("get_todo", {"todo_id": str(uuid4())})
     assert "not found" in result
 
 
 async def test_run_tool_get_todo_invalid_uuid(patched_session: AsyncSession) -> None:
-    result = await cs._run_tool("get_todo", {"todo_id": "not-a-uuid"})
-    assert "Invalid todo_id" in result
+    result = await cs._run_tool_via_mcp("get_todo", {"todo_id": "not-a-uuid"})
+    assert "Invalid" in result
 
 
 async def test_run_tool_update_todo(patched_session: AsyncSession) -> None:
     created = await todo_service.create_todo(patched_session, TodoCreate(title="Old"))
-    result = await cs._run_tool(
+    result = await cs._run_tool_via_mcp(
         "update_todo",
         {"todo_id": str(created.id), "title": "New", "is_completed": True},
     )
@@ -89,19 +118,44 @@ async def test_run_tool_update_todo(patched_session: AsyncSession) -> None:
     assert data["is_completed"] is True
 
 
+async def test_run_tool_update_todo_priority_and_due_date(
+    patched_session: AsyncSession,
+) -> None:
+    created = await todo_service.create_todo(patched_session, TodoCreate(title="Task"))
+    result = await cs._run_tool_via_mcp(
+        "update_todo",
+        {"todo_id": str(created.id), "priority": 2, "due_date": "2026-08-01"},
+    )
+    data = json.loads(result)
+    assert data["priority"] == 2
+    assert data["due_date"] == "2026-08-01"
+
+
+async def test_run_tool_update_todo_clear_due_date(patched_session: AsyncSession) -> None:
+    created = await todo_service.create_todo(
+        patched_session, TodoCreate(title="Task", due_date="2026-08-01")
+    )
+    result = await cs._run_tool_via_mcp(
+        "update_todo",
+        {"todo_id": str(created.id), "due_date": "clear"},
+    )
+    data = json.loads(result)
+    assert data["due_date"] is None
+
+
 async def test_run_tool_update_todo_not_found(patched_session: AsyncSession) -> None:
-    result = await cs._run_tool("update_todo", {"todo_id": str(uuid4()), "title": "X"})
+    result = await cs._run_tool_via_mcp("update_todo", {"todo_id": str(uuid4()), "title": "X"})
     assert "not found" in result
 
 
 async def test_run_tool_delete_todo(patched_session: AsyncSession) -> None:
     created = await todo_service.create_todo(patched_session, TodoCreate(title="Bye"))
-    result = await cs._run_tool("delete_todo", {"todo_id": str(created.id)})
+    result = await cs._run_tool_via_mcp("delete_todo", {"todo_id": str(created.id)})
     assert "Deleted" in result
 
 
 async def test_run_tool_delete_todo_not_found(patched_session: AsyncSession) -> None:
-    result = await cs._run_tool("delete_todo", {"todo_id": str(uuid4())})
+    result = await cs._run_tool_via_mcp("delete_todo", {"todo_id": str(uuid4())})
     assert "not found" in result
 
 
@@ -109,13 +163,124 @@ async def test_run_tool_clear_completed(patched_session: AsyncSession) -> None:
     await todo_service.create_todo(patched_session, TodoCreate(title="Active"))
     await todo_service.create_todo(patched_session, TodoCreate(title="Done1", is_completed=True))
     await todo_service.create_todo(patched_session, TodoCreate(title="Done2", is_completed=True))
-    result = await cs._run_tool("clear_completed", {})
+    result = await cs._run_tool_via_mcp("clear_completed", {})
     assert "2" in result
 
 
+async def test_run_tool_reorder_todos(patched_session: AsyncSession) -> None:
+    t1 = await todo_service.create_todo(patched_session, TodoCreate(title="A"))
+    t2 = await todo_service.create_todo(patched_session, TodoCreate(title="B"))
+    result = await cs._run_tool_via_mcp(
+        "reorder_todos",
+        {"items": [{"id": str(t2.id), "position": 0}, {"id": str(t1.id), "position": 1}]},
+    )
+    data = json.loads(result)
+    assert len(data) >= 2
+
+
 async def test_run_tool_unknown_tool(patched_session: AsyncSession) -> None:
-    result = await cs._run_tool("nonexistent_tool", {})
-    assert "Unknown tool" in result
+    result = await cs._run_tool_via_mcp("nonexistent_tool", {})
+    assert "nonexistent_tool" in result
+
+
+# --- _build_openai_tools tests ---
+
+
+async def test_build_openai_tools_includes_all_tools(patched_session: AsyncSession) -> None:
+    cs._cached_openai_tools = None
+    tools = await cs._build_openai_tools()
+    names = [t["function"]["name"] for t in tools]
+    assert "list_todos" in names
+    assert "create_todo" in names
+    assert "update_todo" in names
+    assert "delete_todo" in names
+    assert "get_todo" in names
+    assert "clear_completed" in names
+    assert "reorder_todos" in names
+
+
+async def test_build_openai_tools_has_priority_and_due_date(
+    patched_session: AsyncSession,
+) -> None:
+    cs._cached_openai_tools = None
+    tools = await cs._build_openai_tools()
+    create_fn = next(t for t in tools if t["function"]["name"] == "create_todo")
+    props = create_fn["function"]["parameters"]["properties"]
+    assert "priority" in props
+    assert "due_date" in props
+
+    update_fn = next(t for t in tools if t["function"]["name"] == "update_todo")
+    props = update_fn["function"]["parameters"]["properties"]
+    assert "priority" in props
+    assert "due_date" in props
+
+
+async def test_build_openai_tools_no_anyof(patched_session: AsyncSession) -> None:
+    """OpenAI function calling doesn't support anyOf — schemas must be flattened."""
+    cs._cached_openai_tools = None
+    tools = await cs._build_openai_tools()
+    for t in tools:
+        schema_str = json.dumps(t["function"]["parameters"])
+        assert "anyOf" not in schema_str, f"anyOf found in {t['function']['name']}"
+
+
+# --- _mcp_schema_to_openai tests ---
+
+
+def test_flatten_anyof_string_or_null() -> None:
+    result = cs._flatten_anyof({
+        "anyOf": [{"type": "string"}, {"type": "null"}],
+        "description": "Optional desc",
+        "default": None,
+    })
+    assert result == {"type": "string", "description": "Optional desc", "default": None}
+
+
+def test_flatten_anyof_integer_or_null() -> None:
+    result = cs._flatten_anyof({
+        "anyOf": [{"type": "integer"}, {"type": "null"}],
+        "default": None,
+    })
+    assert result == {"type": "integer", "default": None}
+
+
+def test_flatten_anyof_passthrough_plain_type() -> None:
+    result = cs._flatten_anyof({"type": "string", "description": "A field"})
+    assert result == {"type": "string", "description": "A field"}
+
+
+def test_mcp_schema_to_openai_strips_additional_properties() -> None:
+    result = cs._mcp_schema_to_openai({
+        "type": "object",
+        "additionalProperties": False,
+        "properties": {
+            "title": {"type": "string", "description": "Title"},
+        },
+        "required": ["title"],
+    })
+    assert "additionalProperties" not in result
+    assert "title" in result["properties"]
+    assert result["required"] == ["title"]
+
+
+def test_mcp_schema_to_openai_flattens_anyof_in_items() -> None:
+    result = cs._mcp_schema_to_openai({
+        "type": "object",
+        "properties": {
+            "items": {
+                "type": "array",
+                "items": {
+                    "additionalProperties": True,
+                    "type": "object",
+                },
+                "description": "List of items",
+            }
+        },
+        "required": ["items"],
+    })
+    items = result["properties"]["items"]
+    assert items["type"] == "array"
+    assert items["items"] == {"type": "object"}
 
 
 # --- chat() tests ---

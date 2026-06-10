@@ -314,15 +314,53 @@ async with Client(mcp) as client:
 
 ## Frontend
 
-The app serves a single-page app at `/` built with **Preact + htm** (no build step).
+The app serves a single-page app at `/` built with **Preact + htm** (no build step). The frontend is organized as modular ES modules under `static/`.
+
+### File structure
+
+```
+static/
+├── css/
+│   ├── variables.css    # CSS custom properties, reset, light/dark/auto themes
+│   ├── base.css         # Body, container, header, progress, toast, stats
+│   ├── components.css   # All component styles (input, toolbar, todo, calendar, chat)
+│   └── responsive.css   # Mobile media queries
+└── js/
+    ├── preact.js         # Re-exports Preact + htm from CDN (single import point)
+    ├── main.js           # Entry point: renders <App /> into #app
+    ├── app.js            # App component (state management, API orchestration)
+    ├── api.js            # All REST API and chat API helper functions
+    ├── utils.js           # formatDate, priorityBadge, getWeekDates, etc.
+    └── components/
+        ├── InputRow.js
+        ├── Toolbar.js
+        ├── TodoList.js
+        ├── TodoItem.js
+        ├── CalendarView.js
+        ├── ChatBubble.js
+        ├── ChatPanel.js
+        ├── ThemeToggle.js
+        └── Toast.js
+```
+
+`index.html` is a minimal shell that loads the CSS files and the JS entry point. FastAPI serves `index.html` at `/` and mounts `static/` at `/static`.
 
 ### Features
 
 - **List view** — Filter pills (All / Active / Completed), drag-and-drop reorder, priority badges (P1/P2/P3), due dates with overdue highlighting
-- **Calendar view** — Weekly grid with prev/next week navigation, "Today" button, priority-sorted cards (P1 first), unscheduled section
+- **Calendar view** — Weekly grid with prev/next week navigation, "Today" button, priority-sorted cards, unscheduled section, "Other dates" section for out-of-week todos
 - **Add-todo form** — Priority dropdown (None / P3 / P2 / P1) and date picker
 - **AI chat widget** — Streaming responses, session persistence, provider detection
 - **Theme toggle** — Light / Auto / Dark, persisted in localStorage
+
+### Adding a new frontend component
+
+1. Create `static/js/components/MyComponent.js`
+2. Import from `preact.js`: `import { html, useState } from '../preact.js'`
+3. Export the component: `export function MyComponent({ ... }) { return html\`...\`; }`
+4. Import and use it in `app.js`
+5. Add styles to `static/css/components.css`
+6. No build step required — browsers handle ES modules natively
 
 ## Debugging
 
@@ -352,7 +390,7 @@ Debug mode is useful for:
 
 ```
 app/
-├── main.py                   # FastAPI app + MCP mount at /mcp
+├── main.py                   # FastAPI app + static mount + MCP mount at /mcp
 ├── config.py                 # pydantic-settings (DATABASE_URL, CHAT_MODEL, etc.)
 ├── database.py               # async engine + session factory
 ├── dependencies.py           # get_todo_or_404 FastAPI dependency
@@ -369,6 +407,29 @@ app/
     ├── chat_service.py        # LLM agentic loop via LiteLLM (tools → MCP)
     └── chat_history.py        # chat session + message persistence
 
+static/                        # Frontend assets (no build step)
+├── css/
+│   ├── variables.css          # CSS custom properties + theme variants
+│   ├── base.css               # Body, container, header, progress, toast
+│   ├── components.css         # All component styles
+│   └── responsive.css         # Mobile media queries
+└── js/
+    ├── preact.js               # Re-exports Preact + htm from CDN
+    ├── main.js                 # Entry point: renders <App />
+    ├── app.js                  # App component (state, API calls)
+    ├── api.js                  # API helper functions
+    ├── utils.js                # formatDate, priorityBadge, etc.
+    └── components/
+        ├── InputRow.js
+        ├── Toolbar.js
+        ├── TodoList.js
+        ├── TodoItem.js
+        ├── CalendarView.js
+        ├── ChatBubble.js
+        ├── ChatPanel.js
+        ├── ThemeToggle.js
+        └── Toast.js
+
 tests/
 ├── conftest.py                # session, client, mcp_client fixtures
 ├── test_routers/
@@ -383,4 +444,4 @@ tests/
     └── test_mcp_server.py      # MCP tool tests (in-process fastmcp.Client)
 ```
 
-See [`AGENTS.md`](../AGENTS.md) for the full architecture specification.
+See [`AGENTS.md`](../AGENTS.md) for the full architecture specification and [`CONTRIBUTING.md`](../CONTRIBUTING.md) for development guidelines.

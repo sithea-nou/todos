@@ -1,0 +1,87 @@
+*, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
+
+:root {
+    --bg: #f8f9fa;
+    --surface: #ffffff;
+    --surface-hover: #fafafa;
+    --text-primary: #1a1a1a;
+    --text-secondary: #6b7280;
+    --text-muted: #9ca3af;
+    --accent: #6366f1;
+    --accent-hover: #4f46e5;
+    --accent-light: #eef2ff;
+    --border: #e5e7eb;
+    --border-focus: #6366f1;
+    --danger: #ef4444;
+    --danger-light: #fef2f2;
+    --success: #22c55e;
+    --chat-assistant-bg: #f3f4f6;
+    --chat-provider-bg: #ffffff;
+    --priority-p1-bg: #fef2f2; --priority-p1-text: #dc2626;
+    --priority-p2-bg: #fff7ed; --priority-p2-text: #ea580c;
+    --priority-p3-bg: #fefce8; --priority-p3-text: #ca8a04;
+    --toast-error-bg: #fef2f2; --toast-error-border: #fecaca;
+    --shadow-sm: 0 1px 2px rgba(0,0,0,0.05);
+    --shadow: 0 1px 3px rgba(0,0,0,0.08), 0 1px 2px rgba(0,0,0,0.05);
+    --shadow-md: 0 4px 6px rgba(0,0,0,0.07), 0 2px 4px rgba(0,0,0,0.05);
+    --shadow-lg: 0 10px 25px rgba(0,0,0,0.1), 0 4px 10px rgba(0,0,0,0.05);
+    --radius: 8px;
+    --radius-lg: 12px;
+    --font: system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+}
+
+[data-theme="dark"] {
+    --bg: #0f0f11;
+    --surface: #1a1a1f;
+    --surface-hover: #222228;
+    --text-primary: #e5e5e5;
+    --text-secondary: #a1a1aa;
+    --text-muted: #71717a;
+    --accent: #818cf8;
+    --accent-hover: #6366f1;
+    --accent-light: rgba(99,102,241,0.15);
+    --border: #2d2d35;
+    --border-focus: #818cf8;
+    --danger: #f87171;
+    --danger-light: rgba(239,68,68,0.12);
+    --success: #4ade80;
+    --chat-assistant-bg: #222228;
+    --chat-provider-bg: #1a1a1f;
+    --priority-p1-bg: rgba(220,38,38,0.15); --priority-p1-text: #fca5a5;
+    --priority-p2-bg: rgba(234,88,12,0.15); --priority-p2-text: #fdba74;
+    --priority-p3-bg: rgba(202,138,4,0.15); --priority-p3-text: #fde047;
+    --toast-error-bg: rgba(239,68,68,0.12); --toast-error-border: rgba(252,165,165,0.2);
+    --shadow-sm: 0 1px 2px rgba(0,0,0,0.2);
+    --shadow: 0 1px 3px rgba(0,0,0,0.3), 0 1px 2px rgba(0,0,0,0.2);
+    --shadow-md: 0 4px 6px rgba(0,0,0,0.3), 0 2px 4px rgba(0,0,0,0.2);
+    --shadow-lg: 0 10px 25px rgba(0,0,0,0.4), 0 4px 10px rgba(0,0,0,0.2);
+}
+
+@media (prefers-color-scheme: dark) {
+    [data-theme="auto"] {
+        --bg: #0f0f11;
+        --surface: #1a1a1f;
+        --surface-hover: #222228;
+        --text-primary: #e5e5e5;
+        --text-secondary: #a1a1aa;
+        --text-muted: #71717a;
+        --accent: #818cf8;
+        --accent-hover: #6366f1;
+        --accent-light: rgba(99,102,241,0.15);
+        --border: #2d2d35;
+        --border-focus: #818cf8;
+        --danger: #f87171;
+        --danger-light: rgba(239,68,68,0.12);
+        --success: #4ade80;
+        --chat-assistant-bg: #222228;
+        --chat-provider-bg: #1a1a1f;
+        --priority-p1-bg: rgba(220,38,38,0.15); --priority-p1-text: #fca5a5;
+        --priority-p2-bg: rgba(234,88,12,0.15); --priority-p2-text: #fdba74;
+        --priority-p3-bg: rgba(202,138,4,0.15); --priority-p3-text: #fde047;
+        --toast-error-bg: rgba(239,68,68,0.12); --toast-error-border: rgba(252,165,165,0.2);
+        --shadow-sm: 0 1px 2px rgba(0,0,0,0.2);
+        --shadow: 0 1px 3px rgba(0,0,0,0.3), 0 1px 2px rgba(0,0,0,0.2);
+        --shadow-md: 0 4px 6px rgba(0,0,0,0.3), 0 2px 4px rgba(0,0,0,0.2);
+        --shadow-lg: 0 10px 25px rgba(0,0,0,0.4), 0 4px 10px rgba(0,0,0,0.2);
+    }
+}

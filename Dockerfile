@@ -21,6 +21,7 @@ RUN --mount=type=cache,target=/root/.cache/uv \
 # Now copy the source and install the project itself
 COPY app ./app
 COPY index.html ./
+COPY static ./static/
 RUN --mount=type=cache,target=/root/.cache/uv \
     uv sync --frozen --no-dev
 
@@ -37,6 +38,7 @@ WORKDIR /app
 COPY --from=builder /app/.venv /app/.venv
 COPY --from=builder /app/app /app/app
 COPY --from=builder /app/index.html /app/index.html
+COPY --from=builder /app/static /app/static
 
 # Ensure the venv is on PATH
 ENV PATH="/app/.venv/bin:$PATH" \

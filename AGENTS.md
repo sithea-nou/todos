@@ -34,15 +34,38 @@
 ```text
 root/
 ├── AGENTS.md             # ← You are here
+├── CONTRIBUTING.md      # Contributing guide
 ├── pyproject.toml        # Dependencies, metadata, pytest/ruff/mypy config
 ├── uv.lock               # Locked deps (committed)
 ├── Dockerfile            # Multi-stage build (builder + runtime)
 ├── docker-compose.yml    # Single-service compose with persistent volume
-├── index.html            # Frontend SPA (Preact + htm, served at /)
+├── index.html            # Minimal HTML shell (theme script + CSS/JS links)
+├── static/               # Frontend assets (no build step)
+│   ├── css/
+│   │   ├── variables.css  # CSS custom properties + reset + theme variants
+│   │   ├── base.css       # Body, container, header, progress, toast
+│   │   ├── components.css # All component styles
+│   │   └── responsive.css # Mobile media queries
+│   └── js/
+│       ├── preact.js       # Re-exports Preact + htm from CDN
+│       ├── main.js         # Entry point: renders <App />
+│       ├── app.js          # App component (state, API calls)
+│       ├── api.js          # API helper functions
+│       ├── utils.js        # formatDate, priorityBadge, etc.
+│       └── components/
+│           ├── InputRow.js
+│           ├── Toolbar.js
+│           ├── TodoList.js
+│           ├── TodoItem.js
+│           ├── CalendarView.js
+│           ├── ChatBubble.js
+│           ├── ChatPanel.js
+│           ├── ThemeToggle.js
+│           └── Toast.js
 ├── .env                  # Local secrets (gitignored)
 ├── app/
 │   ├── __init__.py
-│   ├── main.py           # FastAPI app, lifespan, MCP mount at /mcp
+│   ├── main.py           # FastAPI app, lifespan, static mount, MCP mount
 │   ├── config.py         # pydantic-settings (DATABASE_URL, SECRET_KEY, …)
 │   ├── database.py       # async engine, async_session_factory, init_db
 │   ├── dependencies.py   # get_todo_or_404 FastAPI dependency
@@ -148,10 +171,15 @@ docker compose up --build              # containerised run
 | `clear_completed` | Delete all completed todos |
 | `reorder_todos` | Batch reorder by position |
 
-### Frontend (index.html)
-- **Preact + htm** single-page app served at `/`
+### Frontend (static/)
+- **Preact + htm** single-page app served at `/`, no build step
+- ES modules with CDN imports centralized in `static/js/preact.js`
+- CSS split by concern: `variables.css` (theme tokens + reset), `base.css` (layout), `components.css` (all component styles), `responsive.css` (mobile)
+- Each Preact component in its own file under `static/js/components/`
+- API helpers in `static/js/api.js`, utilities in `static/js/utils.js`
+- `app/main.py` serves `index.html` at `/` and mounts `static/` at `/static`
 - **List view** with filter pills (All/Active/Completed), drag-and-drop reorder, priority badges, due dates with overdue highlighting
-- **Calendar view** (weekly grid) with prev/next week navigation, priority-sorted cards, unscheduled section, "Today" button
+- **Calendar view** (weekly grid) with prev/next week navigation, priority-sorted cards, unscheduled section, "Other dates" section for out-of-week todos, "Today" button
 - **Add-todo form** with priority dropdown (None/P3/P2/P1) and date picker
 - **AI chat widget** with streaming, session persistence, provider detection
 - **Theme toggle** (Light/Auto/Dark) persisted in localStorage

@@ -33,14 +33,20 @@ async def _session_do[T](coro: Callable[[AsyncSession], Awaitable[T]]) -> T:
 
 
 @mcp.tool
-async def list_todos(completed: bool | None = None) -> list[dict[str, Any]]:
-    """List all todos. Optionally filter by completion status.
+async def list_todos(
+    completed: bool | None = None,
+    order_by: str = "position",
+) -> list[dict[str, Any]]:
+    """List all todos. Optionally filter by completion status and control ordering.
 
     Args:
         completed: True to return only completed todos, False for only active,
             None (default) for all.
+        order_by: Sort order — "position" (default), "priority", or "due_date".
     """
-    todos = await _session_do(lambda s: todo_service.list_todos(s, completed=completed))
+    todos = await _session_do(
+        lambda s: todo_service.list_todos(s, completed=completed, order_by=order_by)
+    )
     return [_serialize(t) for t in todos]
 
 
@@ -63,14 +69,32 @@ async def get_todo(todo_id: str) -> dict[str, Any]:
 
 
 @mcp.tool
-async def create_todo(title: str, description: str | None = None) -> dict[str, Any]:
+async def create_todo(
+    title: str,
+    description: str | None = None,
+    priority: int = 0,
+    due_date: str | None = None,
+) -> dict[str, Any]:
     """Create a new todo.
 
     Args:
         title: Short title for the todo (1-200 chars).
         description: Optional longer description (max 2000 chars).
+        priority: Priority level (0 = normal, higher = more important). Default 0.
+        due_date: Optional due date in YYYY-MM-DD format.
     """
-    payload = TodoCreate(title=title, description=description)
+    from datetime import date as date_type
+
+    parsed_date = None
+    if due_date is not None:
+        parsed_date = date_type.fromisoformat(due_date)
+
+    payload = TodoCreate(
+        title=title,
+        description=description,
+        priority=priority,
+        due_date=parsed_date,
+    )
     todo = await _session_do(lambda s: todo_service.create_todo(s, payload))
     return _serialize(todo)
 
@@ -81,6 +105,8 @@ async def update_todo(
     title: str | None = None,
     description: str | None = None,
     is_completed: bool | None = None,
+    priority: int | None = None,
+    due_date: str | None = None,
 ) -> dict[str, Any]:
     """Update an existing todo. Only the fields you provide are changed.
 
@@ -89,21 +115,31 @@ async def update_todo(
         title: New title (omit to leave unchanged).
         description: New description (omit to leave unchanged).
         is_completed: New completion flag (omit to leave unchanged).
+        priority: New priority level (omit to leave unchanged).
+        due_date: New due date in YYYY-MM-DD format, or "clear" to remove it.
     """
     try:
         parsed = UUID(todo_id)
     except ValueError as exc:
         raise ValueError(f"Invalid todo id: {todo_id!r}") from exc
 
-    # Only include fields the caller explicitly provided; passing None explicitly
-    # marks them as "set" in Pydantic v2, which would overwrite existing values.
-    changes: dict[str, Any] = {
-        k: v
-        for k, v in {
-            "title": title, "description": description, "is_completed": is_completed
-        }.items()
-        if v is not None
-    }
+    changes: dict[str, Any] = {}
+    if title is not None:
+        changes["title"] = title
+    if description is not None:
+        changes["description"] = description
+    if is_completed is not None:
+        changes["is_completed"] = is_completed
+    if priority is not None:
+        changes["priority"] = priority
+    if due_date is not None:
+        from datetime import date as date_type
+
+        if due_date == "clear":
+            changes["due_date"] = None
+        else:
+            changes["due_date"] = date_type.fromisoformat(due_date)
+
     payload = TodoUpdate(**changes)
     todo = await _session_do(lambda s: todo_service.update_todo(s, parsed, payload))
     if todo is None:
@@ -143,3 +179,18 @@ async def clear_completed() -> str:
             if ok:
                 count += 1
     return f"Cleared {count} completed todo{'s' if count != 1 else ''}"
+
+
+@mcp.tool
+async def reorder_todos(items: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    """Batch-reorder todos by updating their positions.
+
+    Args:
+        items: A list of objects with "id" (UUID string) and "position" (int).
+            Example: [{"id": "abc-123", "position": 0}, {"id": "def-456", "position": 1}]
+    """
+    parsed: list[tuple[UUID, int]] = []
+    for item in items:
+        parsed.append((UUID(item["id"]), int(item["position"])))
+    todos = await _session_do(lambda s: todo_service.reorder_todos(s, parsed))
+    return [_serialize(t) for t in todos]

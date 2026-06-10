@@ -1,0 +1,7 @@
+@media (max-width: 480px) {
+    body { padding: 16px 12px; }
+    .chat-panel { width: calc(100vw - 24px); right: 12px; bottom: 80px; height: 60vh; }
+    .delete-btn { opacity: 1; }
+    .calendar-grid { grid-template-columns: repeat(7, 1fr); }
+    .calendar-day { min-height: 60px; }
+}

@@ -7,6 +7,7 @@ from pathlib import Path
 
 from fastapi import FastAPI
 from fastapi.responses import HTMLResponse
+from fastapi.staticfiles import StaticFiles
 from fastmcp.utilities.lifespan import combine_lifespans
 
 from app.config import settings
@@ -39,7 +40,6 @@ app = FastAPI(
 app.include_router(todos.router, prefix="/api/todos", tags=["todos"])
 app.include_router(chat.router, prefix="/api/chat", tags=["chat"])
 app.include_router(chat_sessions.router, prefix="/api/chat", tags=["chat-sessions"])
-app.mount("/mcp", mcp_app)
 
 
 @app.get("/")
@@ -53,3 +53,7 @@ async def serve_frontend() -> HTMLResponse:
 async def health() -> dict[str, str]:
     """Health check endpoint."""
     return {"status": "ok", "app": settings.app_name}
+
+# Mount sub-apps and static files after routes
+app.mount("/mcp", mcp_app)
+app.mount("/static", StaticFiles(directory=Path(__file__).parent.parent / "static"), name="static")

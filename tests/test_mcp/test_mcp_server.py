@@ -19,9 +19,9 @@ async def test_create_then_list_roundtrip(
     assert created.data["title"] == "MCP test"
     assert created.data["description"] == "hi"
     assert created.data["is_completed"] is False
+    assert created.data["priority"] == 0
     todo_id = created.data["id"]
 
-    # The factory patch should have routed the write through our test session.
     rows = (await session.execute(select(Todo))).scalars().all()
     assert len(rows) == 1
     assert str(rows[0].id) == todo_id
@@ -31,11 +31,20 @@ async def test_create_then_list_roundtrip(
     assert listed.data[0]["id"] == todo_id
 
 
+async def test_create_todo_with_priority_and_due_date(
+    mcp_client: Client,
+) -> None:
+    created = await mcp_client.call_tool(
+        "create_todo", {"title": "Important", "priority": 3, "due_date": "2026-07-15"}
+    )
+    assert created.data["priority"] == 3
+    assert created.data["due_date"] == "2026-07-15"
+
+
 async def test_list_todos_filter_completed(mcp_client: Client) -> None:
     """The completed filter narrows results to the requested state."""
     a = await mcp_client.call_tool("create_todo", {"title": "A"})
     b = await mcp_client.call_tool("create_todo", {"title": "B"})
-    # Mark B completed via update_todo (create_todo doesn't expose is_completed).
     await mcp_client.call_tool(
         "update_todo", {"todo_id": b.data["id"], "is_completed": True}
     )
@@ -50,6 +59,15 @@ async def test_list_todos_filter_completed(mcp_client: Client) -> None:
     only_active = await mcp_client.call_tool("list_todos", {"completed": False})
     assert len(only_active.data) == 1
     assert only_active.data[0]["id"] == a.data["id"]
+
+
+async def test_list_todos_order_by(mcp_client: Client) -> None:
+    await mcp_client.call_tool("create_todo", {"title": "Low", "priority": 1})
+    await mcp_client.call_tool("create_todo", {"title": "High", "priority": 3})
+
+    by_priority = await mcp_client.call_tool("list_todos", {"order_by": "priority"})
+    assert len(by_priority.data) == 2
+    assert by_priority.data[0]["priority"] >= by_priority.data[1]["priority"]
 
 
 async def test_get_todo(mcp_client: Client) -> None:
@@ -85,9 +103,32 @@ async def test_update_todo_partial(mcp_client: Client) -> None:
     updated = await mcp_client.call_tool(
         "update_todo", {"todo_id": todo_id, "is_completed": True}
     )
-    assert updated.data["title"] == "old"  # unchanged
-    assert updated.data["description"] == "keep me"  # unchanged
+    assert updated.data["title"] == "old"
+    assert updated.data["description"] == "keep me"
     assert updated.data["is_completed"] is True
+
+
+async def test_update_todo_priority_and_due_date(mcp_client: Client) -> None:
+    created = await mcp_client.call_tool("create_todo", {"title": "Task"})
+    todo_id = created.data["id"]
+
+    updated = await mcp_client.call_tool(
+        "update_todo", {"todo_id": todo_id, "priority": 2, "due_date": "2026-08-01"}
+    )
+    assert updated.data["priority"] == 2
+    assert updated.data["due_date"] == "2026-08-01"
+
+
+async def test_update_todo_clear_due_date(mcp_client: Client) -> None:
+    created = await mcp_client.call_tool(
+        "create_todo", {"title": "Task", "due_date": "2026-08-01"}
+    )
+    todo_id = created.data["id"]
+
+    updated = await mcp_client.call_tool(
+        "update_todo", {"todo_id": todo_id, "due_date": "clear"}
+    )
+    assert updated.data["due_date"] is None
 
 
 async def test_delete_todo(mcp_client: Client) -> None:
@@ -118,3 +159,16 @@ async def test_clear_completed(mcp_client: Client) -> None:
     remaining = await mcp_client.call_tool("list_todos", {})
     assert len(remaining.data) == 1
     assert remaining.data[0]["id"] == active.data["id"]
+
+
+async def test_reorder_todos(mcp_client: Client) -> None:
+    t1 = await mcp_client.call_tool("create_todo", {"title": "A"})
+    t2 = await mcp_client.call_tool("create_todo", {"title": "B"})
+    id1 = t1.data["id"]
+    id2 = t2.data["id"]
+
+    result = await mcp_client.call_tool(
+        "reorder_todos",
+        {"items": [{"id": id2, "position": 0}, {"id": id1, "position": 1}]},
+    )
+    assert len(result.data) >= 2

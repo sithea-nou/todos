@@ -3,308 +3,429 @@
     <head>
         <meta charset="UTF-8" />
         <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-        <title>Todo App</title>
+        <meta name="color-scheme" content="light dark" />
+        <title>MyToDo</title>
         <style>
-            * {
-                margin: 0;
-                padding: 0;
-                box-sizing: border-box;
+            *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
+
+            :root {
+                --bg: #f8f9fa;
+                --surface: #ffffff;
+                --surface-hover: #fafafa;
+                --text-primary: #1a1a1a;
+                --text-secondary: #6b7280;
+                --text-muted: #9ca3af;
+                --accent: #6366f1;
+                --accent-hover: #4f46e5;
+                --accent-light: #eef2ff;
+                --border: #e5e7eb;
+                --border-focus: #6366f1;
+                --danger: #ef4444;
+                --danger-light: #fef2f2;
+                --success: #22c55e;
+                --chat-assistant-bg: #f3f4f6;
+                --chat-provider-bg: #ffffff;
+                --priority-p1-bg: #fef2f2; --priority-p1-text: #dc2626;
+                --priority-p2-bg: #fff7ed; --priority-p2-text: #ea580c;
+                --priority-p3-bg: #fefce8; --priority-p3-text: #ca8a04;
+                --toast-error-bg: #fef2f2; --toast-error-border: #fecaca;
+                --shadow-sm: 0 1px 2px rgba(0,0,0,0.05);
+                --shadow: 0 1px 3px rgba(0,0,0,0.08), 0 1px 2px rgba(0,0,0,0.05);
+                --shadow-md: 0 4px 6px rgba(0,0,0,0.07), 0 2px 4px rgba(0,0,0,0.05);
+                --shadow-lg: 0 10px 25px rgba(0,0,0,0.1), 0 4px 10px rgba(0,0,0,0.05);
+                --radius: 8px;
+                --radius-lg: 12px;
+                --font: system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+            }
+
+            [data-theme="dark"] {
+                --bg: #0f0f11;
+                --surface: #1a1a1f;
+                --surface-hover: #222228;
+                --text-primary: #e5e5e5;
+                --text-secondary: #a1a1aa;
+                --text-muted: #71717a;
+                --accent: #818cf8;
+                --accent-hover: #6366f1;
+                --accent-light: rgba(99,102,241,0.15);
+                --border: #2d2d35;
+                --border-focus: #818cf8;
+                --danger: #f87171;
+                --danger-light: rgba(239,68,68,0.12);
+                --success: #4ade80;
+                --chat-assistant-bg: #222228;
+                --chat-provider-bg: #1a1a1f;
+                --priority-p1-bg: rgba(220,38,38,0.15); --priority-p1-text: #fca5a5;
+                --priority-p2-bg: rgba(234,88,12,0.15); --priority-p2-text: #fdba74;
+                --priority-p3-bg: rgba(202,138,4,0.15); --priority-p3-text: #fde047;
+                --toast-error-bg: rgba(239,68,68,0.12); --toast-error-border: rgba(252,165,165,0.2);
+                --shadow-sm: 0 1px 2px rgba(0,0,0,0.2);
+                --shadow: 0 1px 3px rgba(0,0,0,0.3), 0 1px 2px rgba(0,0,0,0.2);
+                --shadow-md: 0 4px 6px rgba(0,0,0,0.3), 0 2px 4px rgba(0,0,0,0.2);
+                --shadow-lg: 0 10px 25px rgba(0,0,0,0.4), 0 4px 10px rgba(0,0,0,0.2);
+            }
+
+            @media (prefers-color-scheme: dark) {
+                [data-theme="auto"] {
+                    --bg: #0f0f11;
+                    --surface: #1a1a1f;
+                    --surface-hover: #222228;
+                    --text-primary: #e5e5e5;
+                    --text-secondary: #a1a1aa;
+                    --text-muted: #71717a;
+                    --accent: #818cf8;
+                    --accent-hover: #6366f1;
+                    --accent-light: rgba(99,102,241,0.15);
+                    --border: #2d2d35;
+                    --border-focus: #818cf8;
+                    --danger: #f87171;
+                    --danger-light: rgba(239,68,68,0.12);
+                    --success: #4ade80;
+                    --chat-assistant-bg: #222228;
+                    --chat-provider-bg: #1a1a1f;
+                    --priority-p1-bg: rgba(220,38,38,0.15); --priority-p1-text: #fca5a5;
+                    --priority-p2-bg: rgba(234,88,12,0.15); --priority-p2-text: #fdba74;
+                    --priority-p3-bg: rgba(202,138,4,0.15); --priority-p3-text: #fde047;
+                    --toast-error-bg: rgba(239,68,68,0.12); --toast-error-border: rgba(252,165,165,0.2);
+                    --shadow-sm: 0 1px 2px rgba(0,0,0,0.2);
+                    --shadow: 0 1px 3px rgba(0,0,0,0.3), 0 1px 2px rgba(0,0,0,0.2);
+                    --shadow-md: 0 4px 6px rgba(0,0,0,0.3), 0 2px 4px rgba(0,0,0,0.2);
+                    --shadow-lg: 0 10px 25px rgba(0,0,0,0.4), 0 4px 10px rgba(0,0,0,0.2);
+                }
             }
 
             body {
-                font-family: "Segoe UI", Tahoma, Geneva, Verdana, sans-serif;
-                background: linear-gradient(135deg, #0f0c29, #302b63, #24243e);
+                font-family: var(--font);
+                background: var(--bg);
+                color: var(--text-primary);
                 min-height: 100vh;
                 display: flex;
                 justify-content: center;
-                align-items: flex-start;
                 padding: 40px 20px;
+                line-height: 1.5;
             }
 
             .container {
                 width: 100%;
-                max-width: 580px;
+                max-width: 540px;
             }
 
-            h1 {
-                text-align: center;
-                color: #fff;
-                font-size: 2.8rem;
-                font-weight: 300;
-                letter-spacing: 8px;
-                text-transform: uppercase;
-                margin-bottom: 30px;
-                text-shadow: 0 0 20px rgba(139, 92, 246, 0.5);
+            .header {
+                margin-bottom: 28px;
             }
 
-            .input-section {
+            .header h1 {
+                font-size: 1.5rem;
+                font-weight: 600;
+                color: var(--text-primary);
+                letter-spacing: -0.02em;
+            }
+
+            .header p {
+                font-size: 0.85rem;
+                color: var(--text-secondary);
+                margin-top: 2px;
+            }
+
+            .card {
+                background: var(--surface);
+                border-radius: var(--radius-lg);
+                box-shadow: var(--shadow);
+                overflow: hidden;
+            }
+
+            .input-row {
                 display: flex;
-                gap: 10px;
-                margin-bottom: 20px;
-            }
-
-            .input-section input {
-                flex: 1;
+                gap: 8px;
                 padding: 16px 20px;
-                border: 2px solid rgba(255, 255, 255, 0.1);
-                border-radius: 12px;
-                background: rgba(255, 255, 255, 0.07);
-                color: #fff;
-                font-size: 1rem;
+                border-bottom: 1px solid var(--border);
+            }
+
+            .input-row input {
+                flex: 1;
+                padding: 10px 14px;
+                border: 1px solid var(--border);
+                border-radius: var(--radius);
+                background: var(--surface);
+                color: var(--text-primary);
+                font-size: 0.9rem;
+                font-family: var(--font);
                 outline: none;
-                transition:
-                    border-color 0.3s,
-                    background 0.3s;
+                transition: border-color 0.15s, box-shadow 0.15s;
             }
 
-            .input-section input::placeholder {
-                color: rgba(255, 255, 255, 0.4);
-            }
-
-            .input-section input:focus {
-                border-color: #8b5cf6;
-                background: rgba(255, 255, 255, 0.12);
+            .input-row input::placeholder { color: var(--text-muted); }
+            .input-row input:focus {
+                border-color: var(--border-focus);
+                box-shadow: 0 0 0 3px var(--accent-light);
             }
 
             .add-btn {
-                padding: 16px 24px;
+                padding: 10px 18px;
                 border: none;
-                border-radius: 12px;
-                background: linear-gradient(135deg, #8b5cf6, #6d28d9);
+                border-radius: var(--radius);
+                background: var(--accent);
                 color: #fff;
-                font-size: 1.4rem;
+                font-size: 0.9rem;
+                font-weight: 500;
                 cursor: pointer;
-                transition:
-                    transform 0.2s,
-                    box-shadow 0.3s;
-                box-shadow: 0 4px 15px rgba(139, 92, 246, 0.4);
-            }
-
-            .add-btn:hover {
-                transform: scale(1.05);
-                box-shadow: 0 6px 25px rgba(139, 92, 246, 0.6);
-            }
-
-            .add-btn:active {
-                transform: scale(0.97);
-            }
-
-            .filters {
-                display: flex;
-                justify-content: center;
-                gap: 8px;
-                margin-bottom: 20px;
-            }
-
-            .filter-btn {
-                padding: 8px 20px;
-                border: 2px solid rgba(255, 255, 255, 0.15);
-                border-radius: 25px;
-                background: transparent;
-                color: rgba(255, 255, 255, 0.6);
-                font-size: 0.85rem;
-                cursor: pointer;
-                transition: all 0.3s;
-            }
-
-            .filter-btn:hover {
-                border-color: rgba(139, 92, 246, 0.5);
-                color: #fff;
-            }
-
-            .filter-btn.active {
-                background: linear-gradient(135deg, #8b5cf6, #6d28d9);
-                border-color: transparent;
-                color: #fff;
-            }
-
-            .stats {
-                display: flex;
-                justify-content: space-between;
-                align-items: center;
-                padding: 12px 20px;
-                margin-bottom: 10px;
-                color: rgba(255, 255, 255, 0.4);
-                font-size: 0.85rem;
-            }
-
-            .clear-btn {
-                background: none;
-                border: none;
-                color: #f87171;
-                cursor: pointer;
-                font-size: 0.85rem;
-                transition: color 0.3s;
-            }
-
-            .clear-btn:hover {
-                color: #ef4444;
-            }
-
-            .todo-list {
-                list-style: none;
-            }
-
-            .todo-item {
-                display: flex;
-                align-items: center;
-                gap: 14px;
-                padding: 16px 20px;
-                margin-bottom: 10px;
-                background: rgba(255, 255, 255, 0.06);
-                border: 1px solid rgba(255, 255, 255, 0.08);
-                border-radius: 12px;
-                transition: all 0.3s;
-                animation: slideIn 0.3s ease-out;
-            }
-
-            @keyframes slideIn {
-                from {
-                    opacity: 0;
-                    transform: translateY(-10px);
-                }
-                to {
-                    opacity: 1;
-                    transform: translateY(0);
-                }
-            }
-
-            .todo-item:hover {
-                background: rgba(255, 255, 255, 0.1);
-            }
-
-            .todo-item.completed .todo-text {
-                text-decoration: line-through;
-                color: rgba(255, 255, 255, 0.3);
-            }
-
-            .checkbox {
-                width: 22px;
-                height: 22px;
-                border: 2px solid rgba(255, 255, 255, 0.3);
-                border-radius: 50%;
-                cursor: pointer;
-                display: flex;
-                align-items: center;
-                justify-content: center;
-                flex-shrink: 0;
-                transition: all 0.3s;
-            }
-
-            .checkbox:hover {
-                border-color: #8b5cf6;
-            }
-
-            .checkbox.checked {
-                background: linear-gradient(135deg, #8b5cf6, #6d28d9);
-                border-color: transparent;
-            }
-
-            .checkbox.checked::after {
-                content: "✓";
-                color: #fff;
-                font-size: 13px;
-                font-weight: bold;
-            }
-
-            .todo-text {
-                flex: 1;
-                color: rgba(255, 255, 255, 0.85);
-                font-size: 0.95rem;
-                word-break: break-word;
-            }
-
-            .delete-btn {
-                background: none;
-                border: none;
-                color: rgba(255, 255, 255, 0.2);
-                font-size: 1.2rem;
-                cursor: pointer;
-                padding: 4px 8px;
-                border-radius: 8px;
-                transition: all 0.3s;
+                transition: background 0.15s, transform 0.1s;
                 flex-shrink: 0;
             }
+            .add-btn:hover { background: var(--accent-hover); }
+            .add-btn:active { transform: scale(0.97); }
 
-            .delete-btn:hover {
-                color: #f87171;
-                background: rgba(248, 113, 113, 0.1);
-            }
-
-            .empty-state {
-                text-align: center;
-                padding: 50px 20px;
-                color: rgba(255, 255, 255, 0.25);
-            }
-
-            .empty-state .icon {
-                font-size: 3rem;
-                margin-bottom: 15px;
-            }
-
-            .empty-state p {
-                font-size: 1rem;
-            }
-
-            .progress-bar {
-                width: 100%;
-                height: 4px;
-                background: rgba(255, 255, 255, 0.1);
-                border-radius: 2px;
-                margin-bottom: 20px;
+            .progress-track {
+                height: 3px;
+                background: var(--border);
                 overflow: hidden;
             }
 
             .progress-fill {
                 height: 100%;
-                background: linear-gradient(90deg, #8b5cf6, #a78bfa);
-                border-radius: 2px;
-                transition: width 0.5s ease;
+                background: var(--accent);
+                transition: width 0.4s ease;
             }
 
-            /* ── Chat widget ── */
+            .toolbar {
+                display: flex;
+                justify-content: space-between;
+                align-items: center;
+                padding: 12px 20px;
+                border-bottom: 1px solid var(--border);
+            }
+
+            .filter-pills {
+                display: flex;
+                gap: 4px;
+            }
+
+            .filter-pill {
+                padding: 5px 14px;
+                border: none;
+                border-radius: 20px;
+                background: transparent;
+                color: var(--text-secondary);
+                font-size: 0.8rem;
+                font-weight: 500;
+                cursor: pointer;
+                transition: background 0.15s, color 0.15s;
+            }
+            .filter-pill:hover { background: var(--accent-light); color: var(--accent); }
+            .filter-pill.active { background: var(--accent); color: #fff; }
+
+            .clear-btn {
+                background: none;
+                border: none;
+                color: var(--danger);
+                font-size: 0.8rem;
+                cursor: pointer;
+                font-weight: 500;
+                transition: opacity 0.15s;
+            }
+            .clear-btn:disabled { opacity: 0.3; cursor: default; }
+
+            .todo-list {
+                list-style: none;
+                max-height: 420px;
+                overflow-y: auto;
+            }
+
+            .todo-item {
+                display: flex;
+                align-items: center;
+                gap: 12px;
+                padding: 12px 20px;
+                border-bottom: 1px solid var(--border);
+                transition: background 0.12s;
+            }
+            .todo-item:last-child { border-bottom: none; }
+            .todo-item:hover { background: var(--surface-hover); }
+
+            .checkbox {
+                width: 20px;
+                height: 20px;
+                border: 2px solid var(--border);
+                border-radius: 50%;
+                cursor: pointer;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                flex-shrink: 0;
+                transition: all 0.15s;
+            }
+            .checkbox:hover { border-color: var(--accent); }
+            .checkbox.checked {
+                background: var(--accent);
+                border-color: var(--accent);
+            }
+            .checkbox.checked::after {
+                content: "";
+                width: 6px;
+                height: 10px;
+                border: solid #fff;
+                border-width: 0 2px 2px 0;
+                transform: rotate(45deg) translateY(-1px);
+            }
+
+            .todo-content {
+                flex: 1;
+                min-width: 0;
+            }
+
+            .todo-title {
+                font-size: 0.9rem;
+                color: var(--text-primary);
+                word-break: break-word;
+                transition: color 0.15s;
+            }
+
+            .todo-item.completed .todo-title {
+                text-decoration: line-through;
+                color: var(--text-muted);
+            }
+
+            .todo-meta {
+                display: flex;
+                gap: 6px;
+                align-items: center;
+                margin-top: 2px;
+            }
+
+            .priority-badge {
+                display: inline-block;
+                padding: 1px 6px;
+                border-radius: 4px;
+                font-size: 0.65rem;
+                font-weight: 600;
+                text-transform: uppercase;
+                letter-spacing: 0.03em;
+            }
+            .priority-badge.p1 { background: var(--priority-p1-bg); color: var(--priority-p1-text); }
+            .priority-badge.p2 { background: var(--priority-p2-bg); color: var(--priority-p2-text); }
+            .priority-badge.p3 { background: var(--priority-p3-bg); color: var(--priority-p3-text); }
+
+            .due-date {
+                font-size: 0.7rem;
+                color: var(--text-muted);
+            }
+
+            .delete-btn {
+                background: none;
+                border: none;
+                color: var(--text-muted);
+                font-size: 1rem;
+                cursor: pointer;
+                padding: 4px 6px;
+                border-radius: 6px;
+                opacity: 0;
+                transition: all 0.15s;
+                flex-shrink: 0;
+            }
+            .todo-item:hover .delete-btn { opacity: 1; }
+            .delete-btn:hover { color: var(--danger); background: var(--danger-light); }
+
+            .theme-toggle {
+                display: inline-flex;
+                align-items: center;
+                gap: 2px;
+                background: var(--surface);
+                border: 1px solid var(--border);
+                border-radius: 20px;
+                padding: 2px;
+                margin-top: 8px;
+            }
+            .theme-btn {
+                padding: 3px 10px;
+                border: none;
+                border-radius: 16px;
+                background: transparent;
+                color: var(--text-muted);
+                font-size: 0.7rem;
+                font-weight: 500;
+                cursor: pointer;
+                transition: background 0.15s, color 0.15s;
+                display: flex;
+                align-items: center;
+                gap: 3px;
+            }
+            .theme-btn:hover { color: var(--text-secondary); }
+            .theme-btn.active { background: var(--accent); color: #fff; }
+            .theme-btn svg { width: 12px; height: 12px; }
+
+            .empty-state {
+                text-align: center;
+                padding: 48px 20px;
+                color: var(--text-muted);
+            }
+            .empty-state .icon { font-size: 2rem; margin-bottom: 8px; }
+            .empty-state p { font-size: 0.9rem; }
+
+            .stats {
+                padding: 10px 20px;
+                font-size: 0.75rem;
+                color: var(--text-muted);
+                text-align: center;
+                border-top: 1px solid var(--border);
+            }
+
+            .toast {
+                position: fixed;
+                top: 20px;
+                left: 50%;
+                transform: translateX(-50%);
+                padding: 10px 20px;
+                border-radius: var(--radius);
+                font-size: 0.85rem;
+                font-weight: 500;
+                z-index: 2000;
+                animation: toastIn 0.2s ease-out;
+                box-shadow: var(--shadow-lg);
+            }
+            .toast.error { background: var(--toast-error-bg); color: var(--danger); border: 1px solid var(--toast-error-border); }
+
+            @keyframes toastIn {
+                from { opacity: 0; transform: translateX(-50%) translateY(-8px); }
+                to { opacity: 1; transform: translateX(-50%) translateY(0); }
+            }
+
             .chat-bubble {
                 position: fixed;
                 bottom: 28px;
                 right: 28px;
-                width: 56px;
-                height: 56px;
+                width: 52px;
+                height: 52px;
                 border-radius: 50%;
                 border: none;
-                background: linear-gradient(135deg, #8b5cf6, #6d28d9);
+                background: var(--accent);
                 color: #fff;
-                font-size: 1.5rem;
                 cursor: pointer;
-                box-shadow: 0 4px 20px rgba(139, 92, 246, 0.5);
-                transition: transform 0.2s, box-shadow 0.3s;
+                box-shadow: var(--shadow-md);
+                transition: transform 0.15s, box-shadow 0.15s;
                 z-index: 1000;
                 display: flex;
                 align-items: center;
                 justify-content: center;
             }
-
-            .chat-bubble:hover {
-                transform: scale(1.1);
-                box-shadow: 0 6px 28px rgba(139, 92, 246, 0.7);
-            }
+            .chat-bubble:hover { transform: scale(1.08); box-shadow: var(--shadow-lg); }
+            .chat-bubble svg { width: 24px; height: 24px; }
 
             .chat-panel {
                 position: fixed;
-                bottom: 96px;
+                bottom: 92px;
                 right: 28px;
-                width: 360px;
-                height: 500px;
-                background: #1a1730;
-                border: 1px solid rgba(139, 92, 246, 0.3);
-                border-radius: 16px;
+                width: 380px;
+                height: 520px;
+                background: var(--surface);
+                border: 1px solid var(--border);
+                border-radius: var(--radius-lg);
                 display: flex;
                 flex-direction: column;
                 overflow: hidden;
-                box-shadow: 0 8px 40px rgba(0, 0, 0, 0.5);
+                box-shadow: var(--shadow-lg);
                 z-index: 999;
                 transition: opacity 0.2s, transform 0.2s;
             }
-
             .chat-panel.hidden {
                 opacity: 0;
                 pointer-events: none;
@@ -312,109 +433,70 @@
             }
 
             .chat-header {
-                padding: 14px 18px;
-                background: linear-gradient(135deg, rgba(139,92,246,0.25), rgba(109,40,217,0.15));
-                border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+                padding: 12px 16px;
+                background: var(--accent-light);
+                border-bottom: 1px solid var(--border);
                 display: flex;
                 align-items: center;
                 justify-content: space-between;
-                gap: 10px;
+                gap: 8px;
             }
-
             .chat-header-title {
                 display: flex;
                 align-items: center;
-                gap: 10px;
+                gap: 8px;
                 flex: 1;
                 min-width: 0;
             }
-
             .chat-header-title > span {
-                color: #fff;
-                font-size: 0.95rem;
-                font-weight: 500;
-                letter-spacing: 0.5px;
+                color: var(--text-primary);
+                font-size: 0.9rem;
+                font-weight: 600;
             }
-
             .chat-provider {
                 display: inline-flex;
                 align-items: center;
-                gap: 6px;
-                padding: 3px 9px;
+                gap: 5px;
+                padding: 2px 8px;
                 border-radius: 999px;
-                font-size: 0.7rem;
+                font-size: 0.65rem;
                 font-weight: 500;
-                background: rgba(139, 92, 246, 0.15);
-                color: #c4b5fd;
-                border: 1px solid rgba(139, 92, 246, 0.25);
-                max-width: 220px;
+                background: var(--chat-provider-bg);
+                color: var(--text-secondary);
+                border: 1px solid var(--border);
+                max-width: 200px;
                 overflow: hidden;
                 text-overflow: ellipsis;
                 white-space: nowrap;
             }
-
             .chat-provider .dot {
                 width: 6px;
                 height: 6px;
                 border-radius: 50%;
-                background: #a78bfa;
+                background: var(--text-muted);
                 flex-shrink: 0;
             }
-
-            .chat-provider.streaming .dot {
-                background: #34d399;
-                box-shadow: 0 0 6px #34d399;
-            }
-
-            .chat-provider.tool-ok .dot { background: #34d399; }
             .chat-provider.tool-warn .dot { background: #fbbf24; }
+            .chat-provider.streaming .dot { background: var(--success); box-shadow: 0 0 6px var(--success); }
+            .chat-provider.tool-ok .dot { background: var(--success); }
 
             .chat-header-right {
                 display: flex;
                 gap: 4px;
                 align-items: center;
             }
-
             .chat-icon-btn {
                 background: none;
                 border: none;
-                color: rgba(255, 255, 255, 0.5);
-                font-size: 0.9rem;
+                color: var(--text-secondary);
+                font-size: 0.85rem;
                 cursor: pointer;
-                line-height: 1;
                 padding: 4px 6px;
                 border-radius: 6px;
                 transition: background 0.15s, color 0.15s;
-            }
-
-            .chat-icon-btn:hover {
-                background: rgba(255, 255, 255, 0.06);
-                color: #fff;
-            }
-
-            .chat-tool-event {
-                align-self: flex-start;
-                max-width: 82%;
-                padding: 6px 10px;
-                border-radius: 8px;
-                background: rgba(139, 92, 246, 0.1);
-                color: rgba(255, 255, 255, 0.55);
-                font-size: 0.72rem;
-                font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, monospace;
-                border: 1px solid rgba(139, 92, 246, 0.18);
-            }
-
-            .chat-close {
-                background: none;
-                border: none;
-                color: rgba(255, 255, 255, 0.5);
-                font-size: 1.1rem;
-                cursor: pointer;
                 line-height: 1;
-                transition: color 0.2s;
             }
-
-            .chat-close:hover { color: #fff; }
+            .chat-icon-btn:hover { background: var(--surface-hover); color: var(--text-primary); }
 
             .chat-messages {
                 flex: 1;
@@ -424,36 +506,33 @@
                 flex-direction: column;
                 gap: 10px;
                 scrollbar-width: thin;
-                scrollbar-color: rgba(139,92,246,0.3) transparent;
+                scrollbar-color: var(--border) transparent;
             }
 
             .chat-msg {
                 max-width: 82%;
                 padding: 10px 14px;
                 border-radius: 12px;
-                font-size: 0.875rem;
+                font-size: 0.85rem;
                 line-height: 1.5;
                 word-break: break-word;
                 white-space: pre-wrap;
             }
-
             .chat-msg.user {
                 align-self: flex-end;
-                background: linear-gradient(135deg, #8b5cf6, #6d28d9);
+                background: var(--accent);
                 color: #fff;
                 border-bottom-right-radius: 4px;
             }
-
             .chat-msg.assistant {
                 align-self: flex-start;
-                background: rgba(255, 255, 255, 0.08);
-                color: rgba(255, 255, 255, 0.88);
+                background: var(--chat-assistant-bg);
+                color: var(--text-primary);
                 border-bottom-left-radius: 4px;
             }
-
             .chat-msg.thinking {
                 align-self: flex-start;
-                color: rgba(255, 255, 255, 0.4);
+                color: var(--text-muted);
                 font-style: italic;
                 font-size: 0.8rem;
                 padding: 6px 10px;
@@ -462,15 +541,13 @@
                 gap: 4px;
                 align-items: center;
             }
-
             .chat-msg.thinking .dot {
                 width: 5px;
                 height: 5px;
                 border-radius: 50%;
-                background: rgba(139, 92, 246, 0.7);
+                background: var(--accent);
                 animation: bounce 1.2s infinite;
             }
-
             .chat-msg.thinking .dot:nth-child(2) { animation-delay: 0.2s; }
             .chat-msg.thinking .dot:nth-child(3) { animation-delay: 0.4s; }
 
@@ -479,712 +556,663 @@
                 30% { transform: translateY(-5px); }
             }
 
+            .chat-tool-event {
+                align-self: flex-start;
+                max-width: 82%;
+                padding: 6px 10px;
+                border-radius: 8px;
+                background: var(--accent-light);
+                color: var(--text-secondary);
+                font-size: 0.7rem;
+                font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, monospace;
+                border: 1px solid rgba(99, 102, 241, 0.2);
+            }
+
             .chat-input-row {
                 padding: 12px;
-                border-top: 1px solid rgba(255, 255, 255, 0.07);
+                border-top: 1px solid var(--border);
                 display: flex;
                 gap: 8px;
             }
-
             .chat-input {
                 flex: 1;
                 padding: 10px 14px;
-                border: 1.5px solid rgba(255, 255, 255, 0.1);
-                border-radius: 10px;
-                background: rgba(255, 255, 255, 0.06);
-                color: #fff;
-                font-size: 0.875rem;
+                border: 1px solid var(--border);
+                border-radius: var(--radius);
+                background: var(--surface);
+                color: var(--text-primary);
+                font-size: 0.85rem;
+                font-family: var(--font);
                 outline: none;
-                transition: border-color 0.2s;
                 resize: none;
-                font-family: inherit;
+                transition: border-color 0.15s;
             }
-
-            .chat-input:focus { border-color: #8b5cf6; }
-            .chat-input::placeholder { color: rgba(255,255,255,0.3); }
+            .chat-input:focus { border-color: var(--border-focus); box-shadow: 0 0 0 3px var(--accent-light); }
+            .chat-input::placeholder { color: var(--text-muted); }
 
             .chat-send {
                 padding: 10px 16px;
                 border: none;
-                border-radius: 10px;
-                background: linear-gradient(135deg, #8b5cf6, #6d28d9);
+                border-radius: var(--radius);
+                background: var(--accent);
                 color: #fff;
-                font-size: 1rem;
+                font-size: 0.9rem;
                 cursor: pointer;
-                transition: transform 0.15s, box-shadow 0.2s;
+                transition: background 0.15s, transform 0.1s;
                 flex-shrink: 0;
             }
+            .chat-send:hover:not(:disabled) { background: var(--accent-hover); }
+            .chat-send:disabled { opacity: 0.4; cursor: not-allowed; }
 
-            .chat-send:hover:not(:disabled) {
-                transform: scale(1.05);
-                box-shadow: 0 2px 10px rgba(139,92,246,0.5);
+            @media (max-width: 480px) {
+                body { padding: 16px 12px; }
+                .chat-panel { width: calc(100vw - 24px); right: 12px; bottom: 80px; height: 60vh; }
+                .delete-btn { opacity: 1; }
             }
-
-            .chat-send:disabled { opacity: 0.5; cursor: not-allowed; }
         </style>
     </head>
     <body>
-        <div class="container">
-            <h1>✅ Todos</h1>
-
-            <div class="input-section">
-                <input
-                    type="text"
-                    id="todoInput"
-                    placeholder="What needs to be done?"
-                    autofocus
-                />
-                <button class="add-btn" id="addBtn">+</button>
-            </div>
-
-            <div class="progress-bar">
-                <div
-                    class="progress-fill"
-                    id="progressFill"
-                    style="width: 0%"
-                ></div>
-            </div>
-
-            <div class="filters">
-                <button class="filter-btn active" data-filter="all">All</button>
-                <button class="filter-btn" data-filter="active">Active</button>
-                <button class="filter-btn" data-filter="completed">
-                    Completed
-                </button>
-            </div>
-
-            <div class="stats">
-                <span id="taskCount">0 tasks left</span>
-                <button class="clear-btn" id="clearCompleted">
-                    Clear completed
-                </button>
-            </div>
-
-            <ul class="todo-list" id="todoList"></ul>
-        </div>
-
-        <!-- Chat widget -->
-        <button class="chat-bubble" id="chatBubble" title="AI Assistant">💬</button>
-
-        <div class="chat-panel hidden" id="chatPanel">
-            <div class="chat-header">
-                <div class="chat-header-title">
-                    <span>AI Assistant</span>
-                    <span
-                        class="chat-provider"
-                        id="chatProvider"
-                        title="Loading provider info…"
-                    >
-                        <span class="dot"></span>
-                        <span id="chatProviderLabel">connecting…</span>
-                    </span>
-                </div>
-                <div class="chat-header-right">
-                    <button
-                        class="chat-icon-btn"
-                        id="chatNew"
-                        title="Start a new chat session"
-                    >
-                        ＋
-                    </button>
-                    <button class="chat-icon-btn" id="chatClose" title="Close">
-                        ✕
-                    </button>
-                </div>
-            </div>
-            <div class="chat-messages" id="chatMessages"></div>
-            <div class="chat-input-row">
-                <textarea
-                    class="chat-input"
-                    id="chatInput"
-                    placeholder="Ask me to manage your todos…"
-                    rows="1"
-                ></textarea>
-                <button class="chat-send" id="chatSend">➤</button>
-            </div>
-        </div>
-
         <script>
-            const todoInput = document.getElementById("todoInput");
-            const addBtn = document.getElementById("addBtn");
-            const todoList = document.getElementById("todoList");
-            const taskCount = document.getElementById("taskCount");
-            const clearCompleted = document.getElementById("clearCompleted");
-            const progressFill = document.getElementById("progressFill");
-            const filterBtns = document.querySelectorAll(".filter-btn");
+            (function() {
+                var t = localStorage.getItem('theme') || 'auto';
+                document.documentElement.setAttribute('data-theme', t);
+            })();
+        </script>
+        <div id="app"></div>
 
-            let todos = [];
-            let currentFilter = "all";
+        <script type="module">
+            import { h, render } from 'https://esm.sh/preact@10.19.3';
+            import { useState, useEffect, useRef, useCallback } from 'https://esm.sh/preact@10.19.3/hooks';
+            import htm from 'https://esm.sh/htm@3.1.1';
+            const html = htm.bind(h);
 
-            // API base URL
-            const API_BASE = "/api/todos";
-
-            // Fetch all todos from the API
-            async function fetchTodos() {
-                try {
-                    const response = await fetch(`${API_BASE}/`);
-                    if (!response.ok) {
-                        throw new Error(
-                            `HTTP error! status: ${response.status}`,
-                        );
-                    }
-                    const data = await response.json();
-                    // Map API response to local format
-                    todos = data.map((todo) => ({
-                        id: todo.id,
-                        text: todo.title,
-                        completed: todo.is_completed,
-                    }));
-                } catch (error) {
-                    console.error("Error fetching todos:", error);
-                    alert("Failed to fetch todos. Please try again.");
-                    todos = [];
-                }
-            }
-
-            // Create a new todo
-            async function createTodo(text) {
-                try {
-                    const response = await fetch(`${API_BASE}/`, {
-                        method: "POST",
-                        headers: {
-                            "Content-Type": "application/json",
-                        },
-                        body: JSON.stringify({ title: text }),
-                    });
-
-                    if (!response.ok) {
-                        throw new Error(
-                            `HTTP error! status: ${response.status}`,
-                        );
-                    }
-                    return await response.json();
-                } catch (error) {
-                    console.error("Error creating todo:", error);
-                    alert("Failed to create todo. Please try again.");
-                    return null;
-                }
-            }
-
-            // Toggle todo completion status
-            async function toggleTodoCompletion(id, is_completed) {
-                try {
-                    const response = await fetch(`${API_BASE}/${id}`, {
-                        method: "PATCH",
-                        headers: {
-                            "Content-Type": "application/json",
-                        },
-                        body: JSON.stringify({ is_completed }),
-                    });
-
-                    if (!response.ok) {
-                        throw new Error(
-                            `HTTP error! status: ${response.status}`,
-                        );
-                    }
-                    return await response.json();
-                } catch (error) {
-                    console.error("Error toggling todo:", error);
-                    alert("Failed to update todo. Please try again.");
-                    return null;
-                }
-            }
-
-            // Delete a todo
-            async function deleteTodoById(id) {
-                try {
-                    const response = await fetch(`${API_BASE}/${id}`, {
-                        method: "DELETE",
-                    });
-
-                    if (!response.ok) {
-                        throw new Error(
-                            `HTTP error! status: ${response.status}`,
-                        );
-                    }
-                } catch (error) {
-                    console.error("Error deleting todo:", error);
-                    alert("Failed to delete todo. Please try again.");
-                }
-            }
-
-            // High-level functions that combine API calls with local state updates
-            async function addTodo(text) {
-                if (!text.trim()) return;
-
-                const newTodo = await createTodo(text);
-                if (newTodo) {
-                    // Fetch updated list, then re-render the DOM
-                    await fetchTodos();
-                    render();
-                    todoInput.value = "";
-                }
-            }
-
-            async function toggleTodo(id) {
-                // Find the todo and get its current completion status
-                const todo = todos.find((t) => t.id === id);
-                if (todo) {
-                    const newStatus = !todo.completed;
-                    await toggleTodoCompletion(id, newStatus);
-                    // Fetch updated list, then re-render the DOM
-                    await fetchTodos();
-                    render();
-                }
-            }
-
-            async function deleteTodo(id) {
-                await deleteTodoById(id);
-                // Fetch updated list, then re-render the DOM
-                await fetchTodos();
-                render();
-            }
-
-            async function clearCompletedTodos() {
-                // Get all completed todo IDs
-                const completedIds = todos
-                    .filter((t) => t.completed)
-                    .map((t) => t.id);
-                // Delete each completed todo
-                for (const id of completedIds) {
-                    await deleteTodoById(id);
-                }
-                // Fetch updated list, then re-render the DOM
-                await fetchTodos();
-                render();
-            }
-
-            function getFilteredTodos() {
-                switch (currentFilter) {
-                    case "active":
-                        return todos.filter((t) => !t.completed);
-                    case "completed":
-                        return todos.filter((t) => t.completed);
-                    default:
-                        return todos;
-                }
-            }
-
-            function updateStats() {
-                const activeCount = todos.filter((t) => !t.completed).length;
-                const totalCount = todos.length;
-                const completedCount = totalCount - activeCount;
-
-                taskCount.textContent = `${activeCount} task${activeCount !== 1 ? "s" : ""} left`;
-
-                const progress =
-                    totalCount === 0 ? 0 : (completedCount / totalCount) * 100;
-                progressFill.style.width = progress + "%";
-
-                clearCompleted.style.visibility =
-                    completedCount > 0 ? "visible" : "hidden";
-            }
-
-            function render() {
-                const filtered = getFilteredTodos();
-                todoList.innerHTML = "";
-
-                if (filtered.length === 0) {
-                    const emptyState = document.createElement("div");
-                    emptyState.className = "empty-state";
-                    let msg = "";
-                    if (currentFilter === "all" && todos.length === 0) {
-                        msg = "No todos yet. Add one above!";
-                    } else if (currentFilter === "active") {
-                        msg = "No active todos. Well done! 🎉";
-                    } else {
-                        msg = "No completed todos yet.";
-                    }
-                    emptyState.innerHTML = `<div class="icon">📋</div><p>${msg}</p>`;
-                    todoList.appendChild(emptyState);
-                } else {
-                    filtered.forEach((todo) => {
-                        const li = document.createElement("li");
-                        li.className = `todo-item${todo.completed ? " completed" : ""}`;
-
-                        li.innerHTML = `
-                        <div class="checkbox${todo.completed ? " checked" : ""}" data-id="${todo.id}"></div>
-                        <span class="todo-text">${escapeHtml(todo.text)}</span>
-                        <button class="delete-btn" data-id="${todo.id}">✕</button>
-                    `;
-
-                        todoList.appendChild(li);
-                    });
-                }
-
-                updateStats();
-            }
+            const API = '/api/todos';
+            const CHAT_API = '/api/chat';
 
             function escapeHtml(text) {
-                const div = document.createElement("div");
-                div.textContent = text;
-                return div.innerHTML;
-            }
-            // Event Listeners - Updated to use async/await
-            addBtn.addEventListener("click", () => addTodo(todoInput.value));
-
-            todoInput.addEventListener("keypress", (e) => {
-                if (e.key === "Enter") addTodo(todoInput.value);
-            });
-
-            todoList.addEventListener("click", async (e) => {
-                const checkbox = e.target.closest(".checkbox");
-                const deleteBtn = e.target.closest(".delete-btn");
-
-                if (checkbox) {
-                    await toggleTodo(checkbox.dataset.id);
-                } else if (deleteBtn) {
-                    await deleteTodo(deleteBtn.dataset.id);
-                }
-            });
-
-            clearCompleted.addEventListener("click", clearCompletedTodos);
-
-            filterBtns.forEach((btn) => {
-                btn.addEventListener("click", () => {
-                    filterBtns.forEach((b) => b.classList.remove("active"));
-                    btn.classList.add("active");
-                    currentFilter = btn.dataset.filter;
-                    render();
-                });
-            });
-
-            // Initial fetch and render
-            async function init() {
-                await fetchTodos();
-                render();
-            }
-            init();
-
-            // ── Chat widget ──
-            const chatBubble = document.getElementById("chatBubble");
-            const chatPanel = document.getElementById("chatPanel");
-            const chatClose = document.getElementById("chatClose");
-            const chatNew = document.getElementById("chatNew");
-            const chatMessages = document.getElementById("chatMessages");
-            const chatInput = document.getElementById("chatInput");
-            const chatSend = document.getElementById("chatSend");
-            const chatProvider = document.getElementById("chatProvider");
-            const chatProviderLabel = document.getElementById("chatProviderLabel");
-
-            let chatHistory = [];
-            let chatOpen = false;
-            let chatSessionId = localStorage.getItem("chatSessionId") || null;
-            let chatStreaming = false;
-            let chatInfo = null;
-
-            chatBubble.addEventListener("click", () => {
-                chatOpen = !chatOpen;
-                chatPanel.classList.toggle("hidden", !chatOpen);
-                if (chatOpen) {
-                    chatInput.focus();
-                    loadChatInfo();
-                }
-            });
-
-            chatClose.addEventListener("click", () => {
-                chatOpen = false;
-                chatPanel.classList.add("hidden");
-            });
-
-            function setProviderLabel(text, state) {
-                chatProviderLabel.textContent = text;
-                chatProvider.classList.remove("streaming", "tool-ok", "tool-warn");
-                if (state) chatProvider.classList.add(state);
-                chatProvider.title = chatInfo
-                    ? `${chatInfo.provider} · ${chatInfo.model}`
-                    : text;
+                const d = document.createElement('div');
+                d.textContent = text;
+                return d.innerHTML;
             }
 
-            async function loadChatInfo() {
-                try {
-                    const res = await fetch("/api/chat/info");
-                    if (!res.ok) throw new Error("info " + res.status);
-                    chatInfo = await res.json();
-                    const supportsTools = chatInfo.tool_use_supported;
-                    const label = `${chatInfo.provider} · ${chatInfo.model}`;
-                    setProviderLabel(label, supportsTools ? "tool-ok" : "tool-warn");
-                } catch (e) {
-                    chatInfo = null;
-                    setProviderLabel("offline", "tool-warn");
-                }
+            function formatDate(iso) {
+                if (!iso) return '';
+                const d = new Date(iso);
+                const months = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+                return `${months[d.getMonth()]} ${d.getDate()}`;
             }
 
-            function appendMessage(role, text) {
-                const div = document.createElement("div");
-                div.className = `chat-msg ${role}`;
-                div.textContent = text;
-                chatMessages.appendChild(div);
-                chatMessages.scrollTop = chatMessages.scrollHeight;
-                return div;
+            function priorityBadge(p) {
+                if (!p || p === 0) return null;
+                if (p >= 3) return { label: 'P1', cls: 'p1' };
+                if (p === 2) return { label: 'P2', cls: 'p2' };
+                return { label: 'P3', cls: 'p3' };
             }
 
-            function appendToolEvent(text) {
-                const div = document.createElement("div");
-                div.className = "chat-tool-event";
-                div.textContent = text;
-                chatMessages.appendChild(div);
-                chatMessages.scrollTop = chatMessages.scrollHeight;
-                return div;
+            function Toast({ message }) {
+                if (!message) return null;
+                return html`<div class="toast error">${message}</div>`;
             }
 
-            function showThinking() {
-                const div = document.createElement("div");
-                div.className = "chat-msg thinking";
-                div.id = "chatThinking";
-                div.innerHTML = '<div class="dot"></div><div class="dot"></div><div class="dot"></div>';
-                chatMessages.appendChild(div);
-                chatMessages.scrollTop = chatMessages.scrollHeight;
+            function ThemeToggle({ theme, onThemeChange }) {
+                const themes = [
+                    { key: 'light', label: 'Light', icon: html`<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/><line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/></svg>` },
+                    { key: 'auto', label: 'Auto', icon: html`<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="3" width="20" height="14" rx="2" ry="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/></svg>` },
+                    { key: 'dark', label: 'Dark', icon: html`<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>` },
+                ];
+
+                return html`
+                    <div class="theme-toggle">
+                        ${themes.map(t => html`
+                            <button
+                                key=${t.key}
+                                class=${`theme-btn${theme === t.key ? ' active' : ''}`}
+                                onClick=${() => onThemeChange(t.key)}
+                                title=${t.label}
+                            >${t.icon}</button>
+                        `)}
+                    </div>
+                `;
             }
 
-            function removeThinking() {
-                const el = document.getElementById("chatThinking");
-                if (el) el.remove();
-            }
+            function App() {
+                const [todos, setTodos] = useState([]);
+                const [filter, setFilter] = useState('all');
+                const [error, setError] = useState(null);
+                const [chatOpen, setChatOpen] = useState(false);
+                const [chatHistory, setChatHistory] = useState([]);
+                const [chatStreaming, setChatStreaming] = useState(false);
+                const [chatInfo, setChatInfo] = useState(null);
+                const [chatSessionId, setChatSessionId] = useState(() => localStorage.getItem('chatSessionId') || null);
+                const [toast, setToast] = useState(null);
+                const [theme, setTheme] = useState(() => localStorage.getItem('theme') || 'auto');
 
-            async function ensureSession() {
-                if (chatSessionId) {
-                    const res = await fetch(`/api/chat/sessions/${chatSessionId}`);
-                    if (res.ok) return chatSessionId;
-                    // stale session
-                    chatSessionId = null;
-                    localStorage.removeItem("chatSessionId");
-                }
-                const res = await fetch("/api/chat/sessions", {
-                    method: "POST",
-                    headers: { "Content-Type": "application/json" },
-                    body: JSON.stringify({ title: "New chat" }),
-                });
-                if (!res.ok) throw new Error("session " + res.status);
-                const session = await res.json();
-                chatSessionId = session.id;
-                localStorage.setItem("chatSessionId", chatSessionId);
-                return chatSessionId;
-            }
+                useEffect(() => {
+                    document.documentElement.setAttribute('data-theme', theme);
+                    localStorage.setItem('theme', theme);
+                }, [theme]);
 
-            function resetSession() {
-                chatSessionId = null;
-                chatHistory = [];
-                localStorage.removeItem("chatSessionId");
-                chatMessages.innerHTML = "";
-            }
+                const showToast = useCallback((msg) => {
+                    setToast(msg);
+                    setTimeout(() => setToast(null), 3000);
+                }, []);
 
-            chatNew.addEventListener("click", async () => {
-                if (chatStreaming) return;
-                resetSession();
-                setProviderLabel(
-                    chatInfo
-                        ? `${chatInfo.provider} · ${chatInfo.model}`
-                        : "connecting…",
-                    chatInfo?.tool_use_supported ? "tool-ok" : "tool-warn"
-                );
-            });
-
-            function consumeSSE(body, onEvent) {
-                const reader = body.getReader();
-                const decoder = new TextDecoder();
-                let buffer = "";
-
-                const dispatch = (raw) => {
-                    // Parse one SSE event block (terminated by a blank line
-                    // per spec, but Uvicorn's StreamingResponse flushes each
-                    // frame after a single ``\n`` so we accept either).
-                    let event = "message";
-                    const dataLines = [];
-                    for (const line of raw.split("\n")) {
-                        if (!line || line.startsWith(":")) continue;
-                        const idx = line.indexOf(":");
-                        if (idx < 0) continue;
-                        const field = line.slice(0, idx);
-                        let value = line.slice(idx + 1);
-                        if (value.startsWith(" ")) value = value.slice(1);
-                        if (field === "event") event = value;
-                        else if (field === "data") dataLines.push(value);
-                    }
-                    if (!dataLines.length) return false;
-                    let parsed;
+                const fetchTodos = useCallback(async () => {
                     try {
-                        parsed = JSON.parse(dataLines.join("\n"));
-                    } catch {
-                        return false;
+                        const res = await fetch(`${API}/?order_by=position`);
+                        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+                        const data = await res.json();
+                        setTodos(data);
+                    } catch (e) {
+                        console.error('Error fetching todos:', e);
+                        showToast('Failed to fetch todos');
+                        setTodos([]);
                     }
-                    parsed._event = event;
-                    return onEvent(parsed);
+                }, [showToast]);
+
+                useEffect(() => { fetchTodos(); }, [fetchTodos]);
+
+                const addTodo = useCallback(async (text) => {
+                    if (!text.trim()) return;
+                    try {
+                        const res = await fetch(`${API}/`, {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ title: text }),
+                        });
+                        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+                        await fetchTodos();
+                    } catch (e) {
+                        console.error('Error creating todo:', e);
+                        showToast('Failed to create todo');
+                    }
+                }, [fetchTodos, showToast]);
+
+                const toggleTodo = useCallback(async (id, isCompleted) => {
+                    try {
+                        const res = await fetch(`${API}/${id}`, {
+                            method: 'PATCH',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ is_completed: !isCompleted }),
+                        });
+                        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+                        await fetchTodos();
+                    } catch (e) {
+                        console.error('Error toggling todo:', e);
+                        showToast('Failed to update todo');
+                    }
+                }, [fetchTodos, showToast]);
+
+                const deleteTodo = useCallback(async (id) => {
+                    try {
+                        const res = await fetch(`${API}/${id}`, { method: 'DELETE' });
+                        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+                        await fetchTodos();
+                    } catch (e) {
+                        console.error('Error deleting todo:', e);
+                        showToast('Failed to delete todo');
+                    }
+                }, [fetchTodos, showToast]);
+
+                const clearCompleted = useCallback(async () => {
+                    const ids = todos.filter(t => t.is_completed).map(t => t.id);
+                    for (const id of ids) {
+                        await fetch(`${API}/${id}`, { method: 'DELETE' });
+                    }
+                    await fetchTodos();
+                }, [todos, fetchTodos]);
+
+                const filtered = todos.filter(t => {
+                    if (filter === 'active') return !t.is_completed;
+                    if (filter === 'completed') return t.is_completed;
+                    return true;
+                });
+
+                const activeCount = todos.filter(t => !t.is_completed).length;
+                const completedCount = todos.filter(t => t.is_completed).length;
+                const progress = todos.length === 0 ? 0 : (completedCount / todos.length) * 100;
+
+                return html`
+                    <div class="container">
+                        <div class="header">
+                            <h1>MyToDo</h1>
+                            <p>${activeCount} task${activeCount !== 1 ? 's' : ''} remaining</p>
+                            <${ThemeToggle} theme=${theme} onThemeChange=${setTheme} />
+                        </div>
+
+                        <div class="card">
+                            <${InputRow} onAdd=${addTodo} />
+                            <div class="progress-track">
+                                <div class="progress-fill" style=${`width: ${progress}%`}></div>
+                            </div>
+                            <${Toolbar}
+                                filter=${filter}
+                                onFilterChange=${setFilter}
+                                completedCount=${completedCount}
+                                onClearCompleted=${clearCompleted}
+                            />
+                            <${TodoList}
+                                todos=${filtered}
+                                onToggle=${toggleTodo}
+                                onDelete=${deleteTodo}
+                                filter=${filter}
+                                totalCount=${todos.length}
+                            />
+                            ${todos.length > 0 && html`
+                                <div class="stats">${completedCount} of ${todos.length} completed</div>
+                            `}
+                        </div>
+                    </div>
+
+                    <${ChatBubble} onClick=${() => setChatOpen(!chatOpen)} />
+                    <${ChatPanel}
+                        open=${chatOpen}
+                        onClose=${() => setChatOpen(false)}
+                        chatInfo=${chatInfo}
+                        setChatInfo=${setChatInfo}
+                        chatHistory=${chatHistory}
+                        setChatHistory=${setChatHistory}
+                        chatStreaming=${chatStreaming}
+                        setChatStreaming=${setChatStreaming}
+                        chatSessionId=${chatSessionId}
+                        setChatSessionId=${setChatSessionId}
+                        onRefreshTodos=${fetchTodos}
+                    />
+                    <${Toast} message=${toast} />
+                `;
+            }
+
+            function InputRow({ onAdd }) {
+                const [value, setValue] = useState('');
+
+                const handleSubmit = (e) => {
+                    e.preventDefault();
+                    onAdd(value);
+                    setValue('');
                 };
 
-                return (async () => {
-                    try {
-                        while (true) {
-                            const { value, done } = await reader.read();
-                            if (done) break;
-                            buffer += decoder.decode(value, { stream: true });
-
-                            // Split on either a blank line (spec-compliant
-                            // servers) or a single newline followed by an
-                            // ``event:`` field (Uvicorn's StreamingResponse
-                            // writes frames verbatim with only one ``\n``).
-                            // The last element is an incomplete tail — keep
-                            // it in the buffer.
-                            const frames = buffer.split(
-                                /\n\n|(?=\nevent:)/
-                            );
-                            buffer = frames.pop() || "";
-                            for (const ev of frames) {
-                                if (!ev.trim()) continue;
-                                const stop = await dispatch(ev);
-                                if (stop) {
-                                    try { await reader.cancel(); } catch (_) {}
-                                    return;
-                                }
-                            }
-                        }
-                        // Drain any trailing event after the stream ends.
-                        if (buffer.trim()) {
-                            await dispatch(buffer);
-                        }
-                    } finally {
-                        try { reader.releaseLock(); } catch (_) {}
-                    }
-                })();
+                return html`
+                    <form class="input-row" onSubmit=${handleSubmit}>
+                        <input
+                            type="text"
+                            value=${value}
+                            onInput=${e => setValue(e.target.value)}
+                            placeholder="What needs to be done?"
+                            autofocus
+                        />
+                        <button class="add-btn" type="submit">Add</button>
+                    </form>
+                `;
             }
 
-            async function sendChat() {
-                const text = chatInput.value.trim();
-                if (!text || chatStreaming) return;
+            function Toolbar({ filter, onFilterChange, completedCount, onClearCompleted }) {
+                const filters = [
+                    { key: 'all', label: 'All' },
+                    { key: 'active', label: 'Active' },
+                    { key: 'completed', label: 'Completed' },
+                ];
 
-                chatInput.value = "";
-                chatInput.style.height = "auto";
-                chatSend.disabled = true;
-                chatStreaming = true;
-                setProviderLabel(
-                    chatInfo
-                        ? `${chatInfo.provider} · ${chatInfo.model}`
-                        : "thinking…",
-                    "streaming"
-                );
+                return html`
+                    <div class="toolbar">
+                        <div class="filter-pills">
+                            ${filters.map(f => html`
+                                <button
+                                    key=${f.key}
+                                    class=${`filter-pill${filter === f.key ? ' active' : ''}`}
+                                    onClick=${() => onFilterChange(f.key)}
+                                >${f.label}</button>
+                            `)}
+                        </div>
+                        <button
+                            class="clear-btn"
+                            disabled=${completedCount === 0}
+                            onClick=${onClearCompleted}
+                        >Clear completed</button>
+                    </div>
+                `;
+            }
 
-                appendMessage("user", text);
-                showThinking();
-
-                let sessionId;
-                try {
-                    sessionId = await ensureSession();
-                } catch (e) {
-                    removeThinking();
-                    chatStreaming = false;
-                    chatSend.disabled = false;
-                    setProviderLabel("session error", "tool-warn");
-                    appendMessage("assistant", "Could not start a chat session.");
-                    return;
+            function TodoList({ todos, onToggle, onDelete, filter, totalCount }) {
+                if (todos.length === 0) {
+                    let msg = 'No todos yet. Add one above!';
+                    if (filter === 'active') msg = 'No active todos. Well done!';
+                    else if (filter === 'completed') msg = 'No completed todos yet.';
+                    return html`
+                        <div class="empty-state">
+                            <div class="icon">
+                                ${filter === 'active' ? '\u2713' : filter === 'completed' ? '\u25cb' : '\ud83d\udccb'}
+                            </div>
+                            <p>${msg}</p>
+                        </div>
+                    `;
                 }
 
-                let assistantEl = null;
-                let buffer = "";
-                let finalText = "";
+                return html`
+                    <ul class="todo-list">
+                        ${todos.map(todo => html`
+                            <${TodoItem}
+                                key=${todo.id}
+                                todo=${todo}
+                                onToggle=${onToggle}
+                                onDelete=${onDelete}
+                            />
+                        `)}
+                    </ul>
+                `;
+            }
 
-                try {
-                    const res = await fetch("/api/chat/stream", {
-                        method: "POST",
-                        headers: { "Content-Type": "application/json" },
-                        body: JSON.stringify({ message: text, session_id: sessionId }),
+            function TodoItem({ todo, onToggle, onDelete }) {
+                const badge = priorityBadge(todo.priority);
+                return html`
+                    <li class=${`todo-item${todo.is_completed ? ' completed' : ''}`}>
+                        <div
+                            class=${`checkbox${todo.is_completed ? ' checked' : ''}`}
+                            onClick=${() => onToggle(todo.id, todo.is_completed)}
+                        ></div>
+                        <div class="todo-content">
+                            <div class="todo-title">${todo.title}</div>
+                            ${(badge || todo.due_date) && html`
+                                <div class="todo-meta">
+                                    ${badge && html`<span class=${`priority-badge ${badge.cls}`}>${badge.label}</span>`}
+                                    ${todo.due_date && html`<span class="due-date">${formatDate(todo.due_date)}</span>`}
+                                </div>
+                            `}
+                        </div>
+                        <button class="delete-btn" onClick=${() => onDelete(todo.id)}>\u00d7</button>
+                    </li>
+                `;
+            }
+
+            function ChatBubble({ onClick }) {
+                return html`
+                    <button class="chat-bubble" onClick=${onClick} title="AI Assistant">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>
+                        </svg>
+                    </button>
+                `;
+            }
+
+            function ChatPanel({ open, onClose, chatInfo, setChatInfo, chatHistory, setChatHistory, chatStreaming, setChatStreaming, chatSessionId, setChatSessionId, onRefreshTodos }) {
+                const messagesRef = useRef(null);
+                const inputRef = useRef(null);
+                const [inputValue, setInputValue] = useState('');
+
+                const setProviderLabel = useCallback((text, state) => {
+                    if (!chatInfo) return;
+                    // handled via chatInfo state
+                }, [chatInfo]);
+
+                useEffect(() => {
+                    if (open) {
+                        loadChatInfo();
+                        inputRef.current?.focus();
+                    }
+                }, [open]);
+
+                async function loadChatInfo() {
+                    try {
+                        const res = await fetch(`${CHAT_API}/info`);
+                        if (!res.ok) throw new Error('info ' + res.status);
+                        const info = await res.json();
+                        setChatInfo(info);
+                    } catch {
+                        setChatInfo(null);
+                    }
+                }
+
+                async function ensureSession() {
+                    if (chatSessionId) {
+                        const res = await fetch(`${CHAT_API}/sessions/${chatSessionId}`);
+                        if (res.ok) return chatSessionId;
+                        setChatSessionId(null);
+                        localStorage.removeItem('chatSessionId');
+                    }
+                    const res = await fetch(`${CHAT_API}/sessions`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ title: 'New chat' }),
                     });
+                    if (!res.ok) throw new Error('session ' + res.status);
+                    const session = await res.json();
+                    setChatSessionId(session.id);
+                    localStorage.setItem('chatSessionId', session.id);
+                    return session.id;
+                }
 
-                    removeThinking();
+                function resetSession() {
+                    setChatSessionId(null);
+                    setChatHistory([]);
+                    localStorage.removeItem('chatSessionId');
+                }
 
-                    if (!res.ok || !res.body) {
-                        appendMessage("assistant", "Error: " + res.status);
+                function appendMessage(role, text) {
+                    setChatHistory(prev => [...prev, { role, content: text }]);
+                    setTimeout(() => {
+                        if (messagesRef.current) {
+                            messagesRef.current.scrollTop = messagesRef.current.scrollHeight;
+                        }
+                    }, 10);
+                }
+
+                function appendToolEvent(text) {
+                    setChatHistory(prev => [...prev, { role: 'tool', content: text }]);
+                    setTimeout(() => {
+                        if (messagesRef.current) {
+                            messagesRef.current.scrollTop = messagesRef.current.scrollHeight;
+                        }
+                    }, 10);
+                }
+
+                function consumeSSE(body, onEvent) {
+                    const reader = body.getReader();
+                    const decoder = new TextDecoder();
+                    let buffer = '';
+
+                    const dispatch = (raw) => {
+                        let event = 'message';
+                        const dataLines = [];
+                        for (const line of raw.split('\n')) {
+                            if (!line || line.startsWith(':')) continue;
+                            const idx = line.indexOf(':');
+                            if (idx < 0) continue;
+                            const field = line.slice(0, idx);
+                            let value = line.slice(idx + 1);
+                            if (value.startsWith(' ')) value = value.slice(1);
+                            if (field === 'event') event = value;
+                            else if (field === 'data') dataLines.push(value);
+                        }
+                        if (!dataLines.length) return false;
+                        let parsed;
+                        try { parsed = JSON.parse(dataLines.join('\n')); } catch { return false; }
+                        parsed._event = event;
+                        return onEvent(parsed);
+                    };
+
+                    return (async () => {
+                        try {
+                            while (true) {
+                                const { value, done } = await reader.read();
+                                if (done) break;
+                                buffer += decoder.decode(value, { stream: true });
+                                const frames = buffer.split(/\n\n|(?=\nevent:)/);
+                                buffer = frames.pop() || '';
+                                for (const ev of frames) {
+                                    if (!ev.trim()) continue;
+                                    const stop = await dispatch(ev);
+                                    if (stop) { try { await reader.cancel(); } catch {} return; }
+                                }
+                            }
+                            if (buffer.trim()) await dispatch(buffer);
+                        } finally {
+                            try { reader.releaseLock(); } catch {}
+                        }
+                    })();
+                }
+
+                async function sendChat() {
+                    const text = inputValue.trim();
+                    if (!text || chatStreaming) return;
+                    setInputValue('');
+                    setChatStreaming(true);
+
+                    appendMessage('user', text);
+                    const thinkIdx = chatHistory.length;
+                    appendMessage('thinking', '...');
+
+                    let sessionId;
+                    try {
+                        sessionId = await ensureSession();
+                    } catch {
+                        setChatStreaming(false);
+                        setChatHistory(prev => prev.filter((_, i) => i !== thinkIdx));
+                        appendMessage('assistant', 'Could not start a chat session.');
                         return;
                     }
 
-                    await consumeSSE(res.body, (ev) => {
-                        if (ev._event === "token") {
-                            buffer += ev.content || ev.delta || "";
-                            if (!assistantEl) {
-                                assistantEl = appendMessage("assistant", "");
-                            }
-                            assistantEl.textContent = buffer;
-                            chatMessages.scrollTop = chatMessages.scrollHeight;
-                        } else if (ev._event === "tool") {
-                            // Any text streamed before a tool call is just preamble,
-                            // not the final answer. Clear it so the user doesn't see it.
-                            buffer = "";
-                            if (assistantEl) assistantEl.textContent = "";
+                    let buffer = '';
+                    let finalText = '';
+                    let thinkingRemoved = false;
+                    const removeThinking = () => {
+                        if (thinkingRemoved) return;
+                        thinkingRemoved = true;
+                        setChatHistory(prev => prev.filter(m => m.role !== 'thinking'));
+                    };
 
-                            // Only show tool-call details for providers with native
-                            // tool support. For Ollama etc. the trace is noisy.
-                            if (chatInfo && chatInfo.tool_use_supported) {
-                                const name = ev.name || "tool";
-                                const args = ev.arguments
-                                    ? JSON.stringify(ev.arguments)
-                                    : "";
-                                appendToolEvent(`→ ${name}${args ? "  " + args : ""}`);
-                            }
-                        } else if (ev._event === "tool_result") {
-                            const name = ev.name || "tool";
-                            const snippet = (ev.content || "").slice(0, 80);
-                            appendToolEvent(`← ${name}  ${snippet}`);
-                        } else if (ev._event === "done") {
-                            finalText = ev.response != null ? ev.response : buffer;
-                        } else if (ev._event === "error") {
-                            appendMessage(
-                                "assistant",
-                                "Error: " + (ev.message || "unknown")
-                            );
-                            return true;
+                    try {
+                        const res = await fetch(`${CHAT_API}/stream`, {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ message: text, session_id: sessionId }),
+                        });
+
+                        if (!res.ok || !res.body) {
+                            removeThinking();
+                            appendMessage('assistant', 'Error: ' + res.status);
+                            return;
                         }
-                        return false;
-                    });
 
-                    if (!finalText && buffer) finalText = buffer;
-                    if (assistantEl) {
-                        assistantEl.textContent = finalText;
-                    } else if (finalText) {
-                        appendMessage("assistant", finalText);
-                    } else {
-                        appendMessage(
-                            "assistant",
-                            "(no response from model)"
-                        );
+                        let assistantEl = null;
+
+                        await consumeSSE(res.body, (ev) => {
+                            if (ev._event === 'token') {
+                                removeThinking();
+                                buffer += ev.content || ev.delta || '';
+                                if (!assistantEl) {
+                                    assistantEl = true;
+                                }
+                            } else if (ev._event === 'tool') {
+                                removeThinking();
+                                buffer = '';
+                                if (chatInfo && chatInfo.tool_use_supported) {
+                                    const name = ev.name || 'tool';
+                                    const args = ev.arguments ? JSON.stringify(ev.arguments) : '';
+                                    appendToolEvent(`\u2192 ${name}${args ? '  ' + args : ''}`);
+                                }
+                            } else if (ev._event === 'tool_result') {
+                                removeThinking();
+                                const name = ev.name || 'tool';
+                                const snippet = (ev.content || '').slice(0, 80);
+                                appendToolEvent(`\u2190 ${name}  ${snippet}`);
+                            } else if (ev._event === 'done') {
+                                removeThinking();
+                                finalText = ev.response != null ? ev.response : buffer;
+                            } else if (ev._event === 'error') {
+                                removeThinking();
+                                appendMessage('assistant', 'Error: ' + (ev.message || 'unknown'));
+                                return true;
+                            }
+                            return false;
+                        });
+
+                        if (!finalText && buffer) finalText = buffer;
+                        if (finalText) {
+                            appendMessage('assistant', finalText);
+                        } else {
+                            appendMessage('assistant', '(no response from model)');
+                        }
+
+                        await onRefreshTodos();
+                    } catch {
+                        removeThinking();
+                        appendMessage('assistant', 'Network error. Please try again.');
+                    } finally {
+                        setChatStreaming(false);
+                        inputRef.current?.focus();
                     }
-
-                    chatHistory.push({ role: "user", content: text });
-                    chatHistory.push({ role: "assistant", content: finalText });
-
-                    await fetchTodos();
-                    render();
-                } catch (err) {
-                    removeThinking();
-                    appendMessage("assistant", "Network error. Please try again.");
-                } finally {
-                    chatStreaming = false;
-                    chatSend.disabled = false;
-                    setProviderLabel(
-                        chatInfo
-                            ? `${chatInfo.provider} · ${chatInfo.model}`
-                            : "connecting…",
-                        chatInfo?.tool_use_supported ? "tool-ok" : "tool-warn"
-                    );
-                    chatInput.focus();
                 }
+
+                const handleNewSession = () => {
+                    if (chatStreaming) return;
+                    resetSession();
+                };
+
+                const handleKeyDown = (e) => {
+                    if (e.key === 'Enter' && !e.shiftKey) {
+                        e.preventDefault();
+                        sendChat();
+                    }
+                };
+
+                const handleInput = (e) => {
+                    setInputValue(e.target.value);
+                    e.target.style.height = 'auto';
+                    e.target.style.height = Math.min(e.target.scrollHeight, 100) + 'px';
+                };
+
+                const providerLabel = chatInfo
+                    ? `${chatInfo.provider} \u00b7 ${chatInfo.model}`
+                    : 'connecting\u2026';
+                const providerState = !chatInfo ? 'tool-warn'
+                    : chatStreaming ? 'streaming'
+                    : chatInfo.tool_use_supported ? 'tool-ok' : 'tool-warn';
+
+                return html`
+                    <div class=${`chat-panel${open ? '' : ' hidden'}`}>
+                        <div class="chat-header">
+                            <div class="chat-header-title">
+                                <span>AI Assistant</span>
+                                <span class=${`chat-provider ${providerState}`} title=${chatInfo ? `${chatInfo.provider} \u00b7 ${chatInfo.model}` : providerLabel}>
+                                    <span class="dot"></span>
+                                    <span>${providerLabel}</span>
+                                </span>
+                            </div>
+                            <div class="chat-header-right">
+                                <button class="chat-icon-btn" onClick=${handleNewSession} title="New chat">+</button>
+                                <button class="chat-icon-btn" onClick=${onClose} title="Close">\u00d7</button>
+                            </div>
+                        </div>
+                        <div class="chat-messages" ref=${messagesRef}>
+                            ${chatHistory.map((msg, i) => {
+                                if (msg.role === 'thinking') {
+                                    return html`<div key=${i} class="chat-msg thinking">
+                                        <div class="dot"></div><div class="dot"></div><div class="dot"></div>
+                                    </div>`;
+                                }
+                                if (msg.role === 'tool') {
+                                    return html`<div key=${i} class="chat-tool-event">${msg.content}</div>`;
+                                }
+                                return html`<div key=${i} class=${`chat-msg ${msg.role}`}>${msg.content}</div>`;
+                            })}
+                        </div>
+                        <div class="chat-input-row">
+                            <textarea
+                                ref=${inputRef}
+                                class="chat-input"
+                                value=${inputValue}
+                                onInput=${handleInput}
+                                onKeyDown=${handleKeyDown}
+                                placeholder="Ask me to manage your todos\u2026"
+                                rows="1"
+                                disabled=${chatStreaming}
+                            ></textarea>
+                            <button class="chat-send" onClick=${sendChat} disabled=${chatStreaming || !inputValue.trim()}>\u27A4</button>
+                        </div>
+                    </div>
+                `;
             }
 
-            chatSend.addEventListener("click", sendChat);
-
-            chatInput.addEventListener("keydown", (e) => {
-                if (e.key === "Enter" && !e.shiftKey) {
-                    e.preventDefault();
-                    sendChat();
-                }
-            });
-
-            // Auto-resize textarea
-            chatInput.addEventListener("input", () => {
-                chatInput.style.height = "auto";
-                chatInput.style.height = Math.min(chatInput.scrollHeight, 100) + "px";
-            });
-
-            // Load provider info on page load
-            loadChatInfo();
+            render(html`<${App} />`, document.getElementById('app'));
         </script>
     </body>
 </html>

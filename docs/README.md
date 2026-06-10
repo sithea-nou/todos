@@ -41,11 +41,12 @@ Create a `.env` file at the project root (or set these in your shell):
 | Method | Path | Description |
 |---|---|---|
 | GET | `/health` | Health check |
-| GET | `/api/todos/` | List todos (`?completed=true/false`) |
-| POST | `/api/todos/` | Create a todo |
+| GET | `/api/todos/` | List todos (`?completed=true/false`, `?order_by=position/priority/due_date`) |
+| POST | `/api/todos/` | Create a todo (`title` required, `priority` and `due_date` optional) |
 | GET | `/api/todos/{id}` | Get a todo |
-| PATCH | `/api/todos/{id}` | Partial update |
+| PATCH | `/api/todos/{id}` | Partial update (supports `priority`, `due_date`, `is_completed`, `title`, `description`) |
 | DELETE | `/api/todos/{id}` | Delete a todo |
+| PATCH | `/api/todos/reorder` | Batch reorder (`{items: [{id, position}, …]}`) |
 | POST | `/api/chat/` | Send a message to the AI chatbot (non-streaming) |
 | POST | `/api/chat/stream` | Send a message and stream the reply via SSE |
 | GET | `/api/chat/info` | Active provider, model, capability flags |
@@ -61,6 +62,12 @@ Interactive docs at `/docs` (Swagger UI) and `/redoc` when the server is running
 ## Chatbot
 
 The app includes an AI chatbot reachable via a floating widget in the UI and the `/api/chat/*` endpoints. It is a full agent — it can list, create, update, and delete todos on your behalf.
+
+### How it works
+
+The chat service uses **LiteLLM** to call any LLM provider. Tool definitions are derived at runtime from the MCP server (the single source of truth) via `_build_openai_tools()` and `_mcp_schema_to_openai()`. Tool execution is routed through the MCP server via `_run_tool_via_mcp()` — there is no duplicate tool logic in the chat service.
+
+The system prompt instructs the LLM to **only set optional fields like `priority` and `due_date` when the user explicitly mentions them**, preventing the model from inventing default values.
 
 ### Endpoints
 
@@ -115,7 +122,7 @@ Proxies `{CHAT_API_BASE}/models` for OpenAI-compatible servers (LM Studio, vLLM,
 
 Create a session with `POST /api/chat/sessions` (body `{"title": "..."}`), then pass the returned `id` as `session_id` on chat calls. The backend will load prior messages on every turn and persist the new turn afterwards. The first user message auto-titles the session.
 
-The frontend widget manages sessions automatically — `session_id` is stored in `localStorage` and reused across messages, with a “+” button to start a new session.
+The frontend widget manages sessions automatically — `session_id` is stored in `localStorage` and reused across messages, with a "+" button to start a new session.
 
 ### Switching providers
 
@@ -265,12 +272,13 @@ The app exposes a [Model Context Protocol](https://modelcontextprotocol.io) serv
 
 | Tool | Description |
 |---|---|
-| `list_todos` | List all todos; optional `completed` bool filter |
+| `list_todos` | List all todos; optional `completed` bool filter and `order_by` sort (`position`, `priority`, `due_date`) |
 | `get_todo` | Fetch a single todo by UUID |
-| `create_todo` | Create a new todo (`title` required, `description` optional) |
-| `update_todo` | Partial update — only the fields you pass are changed |
+| `create_todo` | Create a new todo (`title` required, `priority` and `due_date` optional) |
+| `update_todo` | Partial update — only the fields you pass are changed; set `due_date` to `"clear"` to remove it |
 | `delete_todo` | Delete a todo by UUID |
 | `clear_completed` | Delete every completed todo; returns a count summary |
+| `reorder_todos` | Batch reorder by position (`items: [{id, position}, …]`) |
 
 ### Connecting Claude Desktop
 
@@ -304,6 +312,18 @@ async with Client(mcp) as client:
     print(result.data)  # {"id": "...", "title": "hello", ...}
 ```
 
+## Frontend
+
+The app serves a single-page app at `/` built with **Preact + htm** (no build step).
+
+### Features
+
+- **List view** — Filter pills (All / Active / Completed), drag-and-drop reorder, priority badges (P1/P2/P3), due dates with overdue highlighting
+- **Calendar view** — Weekly grid with prev/next week navigation, "Today" button, priority-sorted cards (P1 first), unscheduled section
+- **Add-todo form** — Priority dropdown (None / P3 / P2 / P1) and date picker
+- **AI chat widget** — Streaming responses, session persistence, provider detection
+- **Theme toggle** — Light / Auto / Dark, persisted in localStorage
+
 ## Debugging
 
 ### Enable debug logging
@@ -336,20 +356,31 @@ app/
 ├── config.py                 # pydantic-settings (DATABASE_URL, CHAT_MODEL, etc.)
 ├── database.py               # async engine + session factory
 ├── dependencies.py           # get_todo_or_404 FastAPI dependency
-├── mcp_server.py             # FastMCP server with 6 tools
-├── models/todo.py            # SQLModel ORM + Pydantic schemas
+├── mcp_server.py             # FastMCP server with 7 tools
+├── models/
+│   ├── todo.py               # SQLModel ORM + Pydantic schemas
+│   └── chat.py               # ChatSession + ChatMessage ORM & schemas
 ├── routers/
-│   ├── todos.py              # REST CRUD routes
-│   └── chat.py               # POST /api/chat/ endpoint
+│   ├── todos.py               # REST CRUD routes (/api/todos/)
+│   ├── chat.py                # Chat streaming/non-streaming + info + models
+│   └── chat_sessions.py       # Chat session CRUD (/api/chat/sessions)
 └── services/
-    ├── todo_service.py       # business logic layer
-    └── chat_service.py       # LLM agentic loop via LiteLLM
+    ├── todo_service.py        # business logic layer
+    ├── chat_service.py        # LLM agentic loop via LiteLLM (tools → MCP)
+    └── chat_history.py        # chat session + message persistence
 
 tests/
-├── conftest.py               # session, client, mcp_client fixtures
-├── test_routers/             # HTTP endpoint tests
-├── test_services/            # service-layer unit tests
-└── test_mcp/                 # MCP tool tests
+├── conftest.py                # session, client, mcp_client fixtures
+├── test_routers/
+│   ├── test_todos.py          # HTTP endpoint tests
+│   ├── test_chat.py           # Non-streaming chat tests
+│   └── test_chat_endpoints.py  # SSE, sessions, models tests
+├── test_services/
+│   ├── test_todo_service.py    # Service-layer unit tests
+│   ├── test_chat_service.py    # Chat service + MCP tool tests
+│   └── test_chat_history.py   # Chat persistence tests
+└── test_mcp/
+    └── test_mcp_server.py      # MCP tool tests (in-process fastmcp.Client)
 ```
 
 See [`AGENTS.md`](../AGENTS.md) for the full architecture specification.

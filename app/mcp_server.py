@@ -72,7 +72,7 @@ async def get_todo(todo_id: str) -> dict[str, Any]:
 async def create_todo(
     title: str,
     description: str | None = None,
-    priority: int = 0,
+    priority: int | None = None,
     due_date: str | None = None,
 ) -> dict[str, Any]:
     """Create a new todo.
@@ -80,8 +80,10 @@ async def create_todo(
     Args:
         title: Short title for the todo (1-200 chars).
         description: Optional longer description (max 2000 chars).
-        priority: Priority level (0 = normal, higher = more important). Default 0.
+        priority: Optional priority. 0=none, 1=low(P3), 2=med(P2), 3+=high(P1).
+            Only set this if the user explicitly mentions priority.
         due_date: Optional due date in YYYY-MM-DD format.
+            Only set this if the user mentions a deadline.
     """
     from datetime import date as date_type
 
@@ -92,7 +94,7 @@ async def create_todo(
     payload = TodoCreate(
         title=title,
         description=description,
-        priority=priority,
+        priority=priority if priority is not None else 0,
         due_date=parsed_date,
     )
     todo = await _session_do(lambda s: todo_service.create_todo(s, payload))
@@ -115,8 +117,10 @@ async def update_todo(
         title: New title (omit to leave unchanged).
         description: New description (omit to leave unchanged).
         is_completed: New completion flag (omit to leave unchanged).
-        priority: New priority level (omit to leave unchanged).
-        due_date: New due date in YYYY-MM-DD format, or "clear" to remove it.
+        priority: New priority. 0=none, 1=low(P3), 2=med(P2), 3+=high(P1).
+            Only set if the user explicitly asks to change priority.
+        due_date: New due date in YYYY-MM-DD format, or "clear" to
+            remove it. Only set if the user mentions a deadline.
     """
     try:
         parsed = UUID(todo_id)

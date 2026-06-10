@@ -139,10 +139,19 @@
                 gap: 8px;
                 padding: 16px 20px;
                 border-bottom: 1px solid var(--border);
+                flex-wrap: wrap;
             }
 
-            .input-row input {
+            .input-main {
+                display: flex;
+                gap: 8px;
                 flex: 1;
+                min-width: 0;
+            }
+
+            .input-row input[type="text"] {
+                flex: 1;
+                min-width: 0;
                 padding: 10px 14px;
                 border: 1px solid var(--border);
                 border-radius: var(--radius);
@@ -154,11 +163,59 @@
                 transition: border-color 0.15s, box-shadow 0.15s;
             }
 
-            .input-row input::placeholder { color: var(--text-muted); }
-            .input-row input:focus {
+            .input-row input[type="text"]::placeholder { color: var(--text-muted); }
+            .input-row input[type="text"]:focus {
                 border-color: var(--border-focus);
                 box-shadow: 0 0 0 3px var(--accent-light);
             }
+
+            .input-options {
+                display: flex;
+                gap: 6px;
+                align-items: center;
+                width: 100%;
+            }
+
+            .priority-select {
+                padding: 6px 10px;
+                border: 1px solid var(--border);
+                border-radius: var(--radius);
+                background: var(--surface);
+                color: var(--text-primary);
+                font-size: 0.8rem;
+                font-family: var(--font);
+                outline: none;
+                cursor: pointer;
+                transition: border-color 0.15s;
+                appearance: none;
+                -webkit-appearance: none;
+                background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%236b7280' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'%3E%3C/polyline%3E%3C/svg%3E");
+                background-repeat: no-repeat;
+                background-position: right 8px center;
+                padding-right: 28px;
+            }
+            .priority-select:focus { border-color: var(--border-focus); }
+
+            .date-input {
+                padding: 6px 10px;
+                border: 1px solid var(--border);
+                border-radius: var(--radius);
+                background: var(--surface);
+                color: var(--text-primary);
+                font-size: 0.8rem;
+                font-family: var(--font);
+                outline: none;
+                cursor: pointer;
+                transition: border-color 0.15s;
+                color-scheme: light;
+            }
+            [data-theme="dark"] .date-input { color-scheme: dark; }
+            [data-theme="auto"] .date-input { color-scheme: auto; }
+            .date-input:focus { border-color: var(--border-focus); }
+            .date-input::-webkit-calendar-picker-indicator { cursor: pointer; opacity: 0.8; filter: invert(0.5); }
+            [data-theme="dark"] .date-input::-webkit-calendar-picker-indicator { filter: invert(1); opacity: 0.7; }
+            [data-theme="auto"] .date-input::-webkit-calendar-picker-indicator { filter: none; opacity: 0.8; }
+            @media (prefers-color-scheme: dark) { [data-theme="auto"] .date-input::-webkit-calendar-picker-indicator { filter: invert(1); opacity: 0.7; } }
 
             .add-btn {
                 padding: 10px 18px;
@@ -193,6 +250,13 @@
                 align-items: center;
                 padding: 12px 20px;
                 border-bottom: 1px solid var(--border);
+                gap: 8px;
+            }
+
+            .toolbar-left {
+                display: flex;
+                align-items: center;
+                gap: 4px;
             }
 
             .filter-pills {
@@ -213,6 +277,30 @@
             }
             .filter-pill:hover { background: var(--accent-light); color: var(--accent); }
             .filter-pill.active { background: var(--accent); color: #fff; }
+
+            .view-toggle {
+                display: flex;
+                border: 1px solid var(--border);
+                border-radius: var(--radius);
+                overflow: hidden;
+            }
+
+            .view-btn {
+                padding: 5px 10px;
+                border: none;
+                background: var(--surface);
+                color: var(--text-muted);
+                cursor: pointer;
+                font-size: 0.8rem;
+                transition: background 0.15s, color 0.15s;
+                display: flex;
+                align-items: center;
+                gap: 3px;
+            }
+            .view-btn + .view-btn { border-left: 1px solid var(--border); }
+            .view-btn.active { background: var(--accent); color: #fff; }
+            .view-btn:hover:not(.active) { background: var(--surface-hover); color: var(--text-secondary); }
+            .view-btn svg { width: 14px; height: 14px; }
 
             .clear-btn {
                 background: none;
@@ -238,9 +326,14 @@
                 padding: 12px 20px;
                 border-bottom: 1px solid var(--border);
                 transition: background 0.12s;
+                position: relative;
             }
             .todo-item:last-child { border-bottom: none; }
             .todo-item:hover { background: var(--surface-hover); }
+            .todo-item.dragging { opacity: 0.4; }
+            .todo-item.drag-over { border-top: 2px solid var(--accent); }
+            .todo-item[draggable="true"] { cursor: grab; }
+            .todo-item[draggable="true"]:active { cursor: grabbing; }
 
             .checkbox {
                 width: 20px;
@@ -309,6 +402,7 @@
                 font-size: 0.7rem;
                 color: var(--text-muted);
             }
+            .due-date.overdue { color: var(--danger); }
 
             .delete-btn {
                 background: none;
@@ -389,6 +483,126 @@
                 to { opacity: 1; transform: translateX(-50%) translateY(0); }
             }
 
+            /* Calendar view */
+            .calendar-view {
+                padding: 12px 20px;
+            }
+            .calendar-nav {
+                display: flex;
+                align-items: center;
+                justify-content: space-between;
+                margin-bottom: 12px;
+            }
+            .calendar-nav h3 {
+                font-size: 0.9rem;
+                font-weight: 600;
+                color: var(--text-primary);
+            }
+            .calendar-nav-btn {
+                background: none;
+                border: 1px solid var(--border);
+                border-radius: var(--radius);
+                color: var(--text-secondary);
+                padding: 4px 10px;
+                cursor: pointer;
+                font-size: 0.85rem;
+                transition: background 0.15s, color 0.15s;
+            }
+            .calendar-nav-btn:hover { background: var(--accent-light); color: var(--accent); }
+            .calendar-grid {
+                display: grid;
+                grid-template-columns: repeat(7, 1fr);
+                gap: 1px;
+                background: var(--border);
+                border-radius: var(--radius);
+                overflow: hidden;
+            }
+            .calendar-day-header {
+                background: var(--surface);
+                padding: 6px 4px;
+                text-align: center;
+                font-size: 0.7rem;
+                font-weight: 600;
+                color: var(--text-muted);
+                text-transform: uppercase;
+            }
+            .calendar-day {
+                background: var(--surface);
+                min-height: 80px;
+                padding: 4px;
+                vertical-align: top;
+            }
+            .calendar-day.today {
+                background: var(--accent-light);
+            }
+            .calendar-day-header-date {
+                font-size: 0.75rem;
+                font-weight: 600;
+                color: var(--text-secondary);
+                margin-bottom: 2px;
+            }
+            .calendar-day.today .calendar-day-header-date {
+                color: var(--accent);
+            }
+            .calendar-card {
+                display: flex;
+                align-items: center;
+                gap: 3px;
+                padding: 2px 4px;
+                margin-bottom: 2px;
+                border-radius: 3px;
+                font-size: 0.65rem;
+                line-height: 1.3;
+                cursor: pointer;
+                border-left: 3px solid transparent;
+                transition: background 0.12s;
+            }
+            .calendar-card:hover { background: var(--surface-hover); }
+            .calendar-card.completed .calendar-card-title { text-decoration: line-through; color: var(--text-muted); }
+            .calendar-card.card-p1 { border-left-color: var(--priority-p1-text); }
+            .calendar-card.card-p2 { border-left-color: var(--priority-p2-text); }
+            .calendar-card.card-p3 { border-left-color: var(--priority-p3-text); }
+            .calendar-card-title {
+                overflow: hidden;
+                text-overflow: ellipsis;
+                white-space: nowrap;
+                color: var(--text-primary);
+            }
+            .calendar-card-check {
+                width: 12px;
+                height: 12px;
+                border: 1.5px solid var(--border);
+                border-radius: 50%;
+                flex-shrink: 0;
+                cursor: pointer;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+            }
+            .calendar-card-check.checked {
+                background: var(--accent);
+                border-color: var(--accent);
+            }
+            .calendar-card-check.checked::after {
+                content: "";
+                width: 4px;
+                height: 6px;
+                border: solid #fff;
+                border-width: 0 1.5px 1.5px 0;
+                transform: rotate(45deg);
+            }
+            .calendar-unscheduled {
+                margin-top: 12px;
+                padding-top: 12px;
+                border-top: 1px solid var(--border);
+            }
+            .calendar-unscheduled h4 {
+                font-size: 0.8rem;
+                color: var(--text-muted);
+                margin-bottom: 8px;
+            }
+
+            /* Chat styles */
             .chat-bubble {
                 position: fixed;
                 bottom: 28px;
@@ -608,6 +822,8 @@
                 body { padding: 16px 12px; }
                 .chat-panel { width: calc(100vw - 24px); right: 12px; bottom: 80px; height: 60vh; }
                 .delete-btn { opacity: 1; }
+                .calendar-grid { grid-template-columns: repeat(7, 1fr); }
+                .calendar-day { min-height: 60px; }
             }
         </style>
     </head>
@@ -637,9 +853,15 @@
 
             function formatDate(iso) {
                 if (!iso) return '';
-                const d = new Date(iso);
+                const d = new Date(iso + 'T00:00:00');
                 const months = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
                 return `${months[d.getMonth()]} ${d.getDate()}`;
+            }
+
+            function isOverdue(dateStr) {
+                if (!dateStr) return false;
+                const d = new Date(dateStr + 'T23:59:59');
+                return d < new Date();
             }
 
             function priorityBadge(p) {
@@ -648,6 +870,40 @@
                 if (p === 2) return { label: 'P2', cls: 'p2' };
                 return { label: 'P3', cls: 'p3' };
             }
+
+            function getWeekDates(offset) {
+                const now = new Date();
+                const day = now.getDay();
+                const mondayOffset = day === 0 ? -6 : 1 - day;
+                const monday = new Date(now.getFullYear(), now.getMonth(), now.getDate() + mondayOffset + offset * 7);
+                const dates = [];
+                for (let i = 0; i < 7; i++) {
+                    const d = new Date(monday);
+                    d.setDate(monday.getDate() + i);
+                    dates.push(d);
+                }
+                return dates;
+            }
+
+            function formatWeekRange(dates) {
+                const months = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+                const s = dates[0], e = dates[6];
+                if (s.getMonth() === e.getMonth()) {
+                    return `${months[s.getMonth()]} ${s.getDate()} \u2013 ${e.getDate()}, ${s.getFullYear()}`;
+                }
+                return `${months[s.getMonth()]} ${s.getDate()} \u2013 ${months[e.getMonth()]} ${e.getDate()}, ${s.getFullYear()}`;
+            }
+
+            function toDateStr(d) {
+                return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+            }
+
+            function normalizeDate(val) {
+                if (!val) return null;
+                return val.slice(0, 10);
+            }
+
+            const DAY_NAMES = ['Mon','Tue','Wed','Thu','Fri','Sat','Sun'];
 
             function Toast({ message }) {
                 if (!message) return null;
@@ -678,6 +934,7 @@
             function App() {
                 const [todos, setTodos] = useState([]);
                 const [filter, setFilter] = useState('all');
+                const [viewMode, setViewMode] = useState('list');
                 const [error, setError] = useState(null);
                 const [chatOpen, setChatOpen] = useState(false);
                 const [chatHistory, setChatHistory] = useState([]);
@@ -712,13 +969,14 @@
 
                 useEffect(() => { fetchTodos(); }, [fetchTodos]);
 
-                const addTodo = useCallback(async (text) => {
-                    if (!text.trim()) return;
+                const addTodo = useCallback(async (data) => {
+                    const body = typeof data === 'string' ? { title: data } : data;
+                    if (!body.title || !body.title.trim()) return;
                     try {
                         const res = await fetch(`${API}/`, {
                             method: 'POST',
                             headers: { 'Content-Type': 'application/json' },
-                            body: JSON.stringify({ title: text }),
+                            body: JSON.stringify(body),
                         });
                         if (!res.ok) throw new Error(`HTTP ${res.status}`);
                         await fetchTodos();
@@ -754,6 +1012,21 @@
                     }
                 }, [fetchTodos, showToast]);
 
+                const updateTodoDate = useCallback(async (id, dueDate) => {
+                    try {
+                        const res = await fetch(`${API}/${id}`, {
+                            method: 'PATCH',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ due_date: dueDate }),
+                        });
+                        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+                        await fetchTodos();
+                    } catch (e) {
+                        console.error('Error updating date:', e);
+                        showToast('Failed to update date');
+                    }
+                }, [fetchTodos, showToast]);
+
                 const clearCompleted = useCallback(async () => {
                     const ids = todos.filter(t => t.is_completed).map(t => t.id);
                     for (const id of ids) {
@@ -761,6 +1034,21 @@
                     }
                     await fetchTodos();
                 }, [todos, fetchTodos]);
+
+                const reorderTodos = useCallback(async (items) => {
+                    try {
+                        const res = await fetch(`${API}/reorder`, {
+                            method: 'PATCH',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ items }),
+                        });
+                        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+                        await fetchTodos();
+                    } catch (e) {
+                        console.error('Error reordering todos:', e);
+                        showToast('Failed to reorder');
+                    }
+                }, [fetchTodos, showToast]);
 
                 const filtered = todos.filter(t => {
                     if (filter === 'active') return !t.is_completed;
@@ -790,14 +1078,26 @@
                                 onFilterChange=${setFilter}
                                 completedCount=${completedCount}
                                 onClearCompleted=${clearCompleted}
+                                viewMode=${viewMode}
+                                onViewModeChange=${setViewMode}
                             />
-                            <${TodoList}
-                                todos=${filtered}
-                                onToggle=${toggleTodo}
-                                onDelete=${deleteTodo}
-                                filter=${filter}
-                                totalCount=${todos.length}
-                            />
+                            ${viewMode === 'calendar'
+                                ? html`<${CalendarView}
+                                    todos=${filtered}
+                                    onToggle=${toggleTodo}
+                                    onDelete=${deleteTodo}
+                                    onUpdateDate=${updateTodoDate}
+                                    filter=${filter}
+                                />`
+                                : html`<${TodoList}
+                                    todos=${filtered}
+                                    onToggle=${toggleTodo}
+                                    onDelete=${deleteTodo}
+                                    onReorder=${reorderTodos}
+                                    filter=${filter}
+                                    totalCount=${todos.length}
+                                />`
+                            }
                             ${todos.length > 0 && html`
                                 <div class="stats">${completedCount} of ${todos.length} completed</div>
                             `}
@@ -824,28 +1124,53 @@
 
             function InputRow({ onAdd }) {
                 const [value, setValue] = useState('');
+                const [priority, setPriority] = useState(0);
+                const [dueDate, setDueDate] = useState('');
 
                 const handleSubmit = (e) => {
                     e.preventDefault();
-                    onAdd(value);
+                    if (!value.trim()) return;
+                    onAdd({
+                        title: value.trim(),
+                        priority: priority || 0,
+                        due_date: dueDate || null,
+                    });
                     setValue('');
+                    setPriority(0);
+                    setDueDate('');
                 };
 
                 return html`
                     <form class="input-row" onSubmit=${handleSubmit}>
-                        <input
-                            type="text"
-                            value=${value}
-                            onInput=${e => setValue(e.target.value)}
-                            placeholder="What needs to be done?"
-                            autofocus
-                        />
-                        <button class="add-btn" type="submit">Add</button>
+                        <div class="input-main">
+                            <input
+                                type="text"
+                                value=${value}
+                                onInput=${e => setValue(e.target.value)}
+                                placeholder="What needs to be done?"
+                                autofocus
+                            />
+                            <button class="add-btn" type="submit">Add</button>
+                        </div>
+                        <div class="input-options">
+                            <select class="priority-select" value=${priority} onChange=${e => setPriority(Number(e.target.value))}>
+                                <option value=${0}>Priority</option>
+                                <option value=${1}>P3 \u2014 Low</option>
+                                <option value=${2}>P2 \u2014 Medium</option>
+                                <option value=${3}>P1 \u2014 High</option>
+                            </select>
+                            <input
+                                type="date"
+                                class="date-input"
+                                value=${dueDate}
+                                onChange=${e => setDueDate(e.target.value)}
+                            />
+                        </div>
                     </form>
                 `;
             }
 
-            function Toolbar({ filter, onFilterChange, completedCount, onClearCompleted }) {
+            function Toolbar({ filter, onFilterChange, completedCount, onClearCompleted, viewMode, onViewModeChange }) {
                 const filters = [
                     { key: 'all', label: 'All' },
                     { key: 'active', label: 'Active' },
@@ -854,14 +1179,32 @@
 
                 return html`
                     <div class="toolbar">
-                        <div class="filter-pills">
-                            ${filters.map(f => html`
+                        <div class="toolbar-left">
+                            <div class="view-toggle">
                                 <button
-                                    key=${f.key}
-                                    class=${`filter-pill${filter === f.key ? ' active' : ''}`}
-                                    onClick=${() => onFilterChange(f.key)}
-                                >${f.label}</button>
-                            `)}
+                                    class=${`view-btn${viewMode === 'list' ? ' active' : ''}`}
+                                    onClick=${() => onViewModeChange('list')}
+                                    title="List view"
+                                >
+                                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/><line x1="3" y1="6" x2="3.01" y2="6"/><line x1="3" y1="12" x2="3.01" y2="12"/><line x1="3" y1="18" x2="3.01" y2="18"/></svg>
+                                </button>
+                                <button
+                                    class=${`view-btn${viewMode === 'calendar' ? ' active' : ''}`}
+                                    onClick=${() => onViewModeChange('calendar')}
+                                    title="Calendar view"
+                                >
+                                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
+                                </button>
+                            </div>
+                            <div class="filter-pills">
+                                ${filters.map(f => html`
+                                    <button
+                                        key=${f.key}
+                                        class=${`filter-pill${filter === f.key ? ' active' : ''}`}
+                                        onClick=${() => onFilterChange(f.key)}
+                                    >${f.label}</button>
+                                `)}
+                            </div>
                         </div>
                         <button
                             class="clear-btn"
@@ -872,7 +1215,12 @@
                 `;
             }
 
-            function TodoList({ todos, onToggle, onDelete, filter, totalCount }) {
+            function TodoList({ todos, onToggle, onDelete, onReorder, filter, totalCount }) {
+                const [dragIdx, setDragIdx] = useState(null);
+                const [overIdx, setOverIdx] = useState(null);
+
+                const canDrag = filter === 'all';
+
                 if (todos.length === 0) {
                     let msg = 'No todos yet. Add one above!';
                     if (filter === 'active') msg = 'No active todos. Well done!';
@@ -887,24 +1235,69 @@
                     `;
                 }
 
+                const handleDragStart = (idx) => {
+                    if (!canDrag) return;
+                    setDragIdx(idx);
+                };
+                const handleDragOver = (e, idx) => {
+                    if (!canDrag) return;
+                    e.preventDefault();
+                    setOverIdx(idx);
+                };
+                const handleDragLeave = () => { setOverIdx(null); };
+                const handleDrop = (e, dropIdx) => {
+                    e.preventDefault();
+                    setOverIdx(null);
+                    if (dragIdx === null || dragIdx === dropIdx) { setDragIdx(null); return; }
+                    const items = [...todos];
+                    const [moved] = items.splice(dragIdx, 1);
+                    items.splice(dropIdx, 0, moved);
+                    setDragIdx(null);
+                    onReorder(items.map((t, i) => ({ id: t.id, position: i })));
+                };
+                const handleDragEnd = () => { setDragIdx(null); setOverIdx(null); };
+
                 return html`
                     <ul class="todo-list">
-                        ${todos.map(todo => html`
+                        ${todos.map((todo, idx) => html`
                             <${TodoItem}
                                 key=${todo.id}
                                 todo=${todo}
                                 onToggle=${onToggle}
                                 onDelete=${onDelete}
+                                draggable=${canDrag}
+                                onDragStart=${() => handleDragStart(idx)}
+                                onDragOver=${(e) => handleDragOver(e, idx)}
+                                onDragLeave=${handleDragLeave}
+                                onDrop=${(e) => handleDrop(e, idx)}
+                                onDragEnd=${handleDragEnd}
+                                isDragging=${dragIdx === idx}
+                                isOver=${overIdx === idx}
                             />
                         `)}
                     </ul>
                 `;
             }
 
-            function TodoItem({ todo, onToggle, onDelete }) {
+            function TodoItem({ todo, onToggle, onDelete, draggable, onDragStart, onDragOver, onDragLeave, onDrop, onDragEnd, isDragging, isOver }) {
                 const badge = priorityBadge(todo.priority);
+                const overdue = isOverdue(todo.due_date);
+                const classes = [
+                    'todo-item',
+                    todo.is_completed ? ' completed' : '',
+                    isDragging ? ' dragging' : '',
+                    isOver ? ' drag-over' : '',
+                ].join('');
                 return html`
-                    <li class=${`todo-item${todo.is_completed ? ' completed' : ''}`}>
+                    <li
+                        class=${classes}
+                        draggable=${draggable}
+                        onDragStart=${onDragStart}
+                        onDragOver=${onDragOver}
+                        onDragLeave=${onDragLeave}
+                        onDrop=${onDrop}
+                        onDragEnd=${onDragEnd}
+                    >
                         <div
                             class=${`checkbox${todo.is_completed ? ' checked' : ''}`}
                             onClick=${() => onToggle(todo.id, todo.is_completed)}
@@ -914,12 +1307,96 @@
                             ${(badge || todo.due_date) && html`
                                 <div class="todo-meta">
                                     ${badge && html`<span class=${`priority-badge ${badge.cls}`}>${badge.label}</span>`}
-                                    ${todo.due_date && html`<span class="due-date">${formatDate(todo.due_date)}</span>`}
+                                    ${todo.due_date && html`<span class=${`due-date${overdue ? ' overdue' : ''}`}>${formatDate(todo.due_date)}</span>`}
                                 </div>
                             `}
                         </div>
                         <button class="delete-btn" onClick=${() => onDelete(todo.id)}>\u00d7</button>
                     </li>
+                `;
+            }
+
+            function CalendarView({ todos, onToggle, onDelete, onUpdateDate, filter }) {
+                const [weekOffset, setWeekOffset] = useState(0);
+                const dates = getWeekDates(weekOffset);
+                const today = toDateStr(new Date());
+
+                const todosByDate = {};
+                const unscheduled = [];
+                for (const t of todos) {
+                    const dd = normalizeDate(t.due_date);
+                    if (dd) {
+                        if (!todosByDate[dd]) todosByDate[dd] = [];
+                        todosByDate[dd].push(t);
+                    } else {
+                        unscheduled.push(t);
+                    }
+                }
+                // Sort each day's cards by priority descending (high priority first)
+                for (const ds of Object.keys(todosByDate)) {
+                    todosByDate[ds].sort((a, b) => (b.priority || 0) - (a.priority || 0));
+                }
+                unscheduled.sort((a, b) => (b.priority || 0) - (a.priority || 0));
+
+                return html`
+                    <div class="calendar-view">
+                        <div class="calendar-nav">
+                            <button class="calendar-nav-btn" onClick=${() => setWeekOffset(weekOffset - 1)}>\u2190 Prev</button>
+                            ${weekOffset !== 0 ? html`<button class="calendar-nav-btn" onClick=${() => setWeekOffset(0)}>Today</button>` : null}
+                            <h3>${formatWeekRange(dates)}</h3>
+                            <button class="calendar-nav-btn" onClick=${() => setWeekOffset(weekOffset + 1)}>Next \u2192</button>
+                        </div>
+                        <div class="calendar-grid">
+                            ${dates.map((d, i) => {
+                                const ds = toDateStr(d);
+                                const isToday = ds === today;
+                                const dayTodos = todosByDate[ds] || [];
+                                return html`
+                                    <div key=${ds} class=${`calendar-day${isToday ? ' today' : ''}`}>
+                                        <div class="calendar-day-header-date">${DAY_NAMES[i]} ${d.getDate()}</div>
+                                        ${dayTodos.map(t => {
+                                            const b = priorityBadge(t.priority);
+                                            return html`
+                                                <div key=${t.id} class=${`calendar-card${t.is_completed ? ' completed' : ''}${b ? ' card-' + b.cls : ''}`}>
+                                                    <div
+                                                        class=${`calendar-card-check${t.is_completed ? ' checked' : ''}`}
+                                                        onClick=${() => onToggle(t.id, t.is_completed)}
+                                                    />
+                                                    ${b && html`<span class=${`priority-badge ${b.cls}`} style="font-size:0.55rem;padding:0 3px;">${b.label}</span>`}
+                                                    <span class="calendar-card-title">${t.title}</span>
+                                                </div>
+                                            `;
+                                        })}
+                                    </div>
+                                `;
+                            })}
+                        </div>
+                        ${unscheduled.length > 0 && html`
+                            <div class="calendar-unscheduled">
+                                <h4>No due date (${unscheduled.length})</h4>
+                                ${unscheduled.map(t => {
+                                    const b = priorityBadge(t.priority);
+                                    return html`
+                                        <div key=${t.id} class=${`todo-item${t.is_completed ? ' completed' : ''}`} style="padding:8px 12px;border-bottom:1px solid var(--border)">
+                                            <div
+                                                class=${`checkbox${t.is_completed ? ' checked' : ''}`}
+                                                onClick=${() => onToggle(t.id, t.is_completed)}
+                                            ></div>
+                                            <div class="todo-content">
+                                                <div class="todo-title">${t.title}</div>
+                                                ${b && html`
+                                                    <div class="todo-meta">
+                                                        <span class=${`priority-badge ${b.cls}`}>${b.label}</span>
+                                                    </div>
+                                                `}
+                                            </div>
+                                            <button class="delete-btn" style="opacity:1" onClick=${() => onDelete(t.id)}>\u00d7</button>
+                                        </div>
+                                    `;
+                                })}
+                            </div>
+                        `}
+                    </div>
                 `;
             }
 
@@ -940,7 +1417,6 @@
 
                 const setProviderLabel = useCallback((text, state) => {
                     if (!chatInfo) return;
-                    // handled via chatInfo state
                 }, [chatInfo]);
 
                 useEffect(() => {

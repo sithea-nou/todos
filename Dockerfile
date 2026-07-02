@@ -1,7 +1,7 @@
 # syntax=docker/dockerfile:1.7
 
 # ---------- Builder stage ----------
-FROM python:3.13-slim AS builder
+FROM python:3.14-slim AS builder
 
 # Install uv (fast Python package manager)
 COPY --from=ghcr.io/astral-sh/uv:latest /uv /usr/local/bin/uv
@@ -26,7 +26,7 @@ RUN --mount=type=cache,target=/root/.cache/uv \
     uv sync --frozen --no-dev
 
 # ---------- Runtime stage ----------
-FROM python:3.13-slim AS runtime
+FROM python:3.14-slim AS runtime
 
 # Create a non-root user for security
 RUN groupadd --system --gid 1001 appuser \

@@ -58,9 +58,13 @@ jobs:
         run: |
           v="${{ steps.ver.outputs.version }}"
           minor="$(echo "$v" | cut -d. -f1-2)"
-          echo "tags=ghcr.io/${{ github.repository }}:$v
-          ghcr.io/${{ github.repository }}:$minor
-          ghcr.io/${{ github.repository }}:latest" >> "$GITHUB_OUTPUT"
+          {
+            echo "tags<<EOF"
+            echo "ghcr.io/${{ github.repository }}:$v"
+            echo "ghcr.io/${{ github.repository }}:$minor"
+            echo "ghcr.io/${{ github.repository }}:latest"
+            echo "EOF"
+          } >> "$GITHUB_OUTPUT"
 
       - uses: docker/setup-buildx-action@v3
 

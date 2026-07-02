@@ -12,8 +12,13 @@ services:
       - CHAT_MODEL=${CHAT_MODEL:-claude-sonnet-4-6}
       - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY:-}
       - OPENAI_API_KEY=${OPENAI_API_KEY:-}
+      - OLLAMA_API_KEY=${OLLAMA_API_KEY:-}
       - CHAT_API_BASE=${CHAT_API_BASE:-}
-      - DEBUG_LOGGING=${DEBUG_LOGGING:-false} 
+      - DEBUG_LOGGING=${DEBUG_LOGGING:-false}
+      # Security (all optional — empty = feature off, safe defaults for personal use)
+      - API_KEY=${API_KEY:-}
+      - CORS_ORIGINS=${CORS_ORIGINS:-}
+      - CHAT_RATE_LIMIT=${CHAT_RATE_LIMIT:-0}
     volumes:
       # Persist the SQLite DB across container restarts
       - todos-data:/app/data

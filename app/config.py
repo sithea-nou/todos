@@ -15,6 +15,20 @@ class Settings(BaseSettings):
     debug_logging: bool = False
     database_url: str = "sqlite+aiosqlite:///./todos.db"
     secret_key: str = "change-me-in-production"
+
+    # Authentication (optional). When api_key is set, non-browser requests
+    # must send `Authorization: Bearer <api_key>` or `X-API-Key: <api_key>`.
+    # Empty string disables auth (open access — the default for local dev).
+    api_key: str = ""
+
+    # CORS (optional). Comma-separated list of allowed origins, or "*" for any.
+    # Empty means same-origin only (the frontend served at / is always allowed).
+    cors_origins: str = ""
+
+    # Rate limiting on the chat endpoints (requests per minute per client).
+    # 0 disables rate limiting.
+    chat_rate_limit: int = 0
+
     anthropic_api_key: str = ""
     openai_api_key: str = ""
     ollama_api_key: str = ""

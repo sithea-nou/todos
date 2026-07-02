@@ -26,6 +26,8 @@ async def _migrate_columns() -> None:
         ("todos", "priority", "INTEGER DEFAULT 0"),
         ("todos", "due_date", "DATE"),
         ("todos", "position", "INTEGER DEFAULT 0"),
+        ("todos", "tags", "VARCHAR(500)"),
+        ("todos", "deleted_at", "DATETIME"),
     ]
     async with engine.begin() as conn:
         for table, column, col_type in migrations:

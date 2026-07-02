@@ -56,4 +56,29 @@ export function normalizeDate(val) {
     return val.slice(0, 10);
 }
 
+export function parseTags(tags) {
+    if (!tags) return [];
+    return tags.split(',').map(t => t.trim()).filter(Boolean);
+}
+
+export function formatTags(tags) {
+    return parseTags(tags).join(', ');
+}
+
+export function isDueSoon(dateStr, days = 2) {
+    if (!dateStr) return false;
+    const d = new Date(dateStr + 'T23:59:59');
+    const now = new Date();
+    const soon = new Date(now.getTime() + days * 24 * 60 * 60 * 1000);
+    return d >= now && d <= soon;
+}
+
+export function daysUntilDue(dateStr) {
+    if (!dateStr) return null;
+    const d = new Date(dateStr + 'T00:00:00');
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    return Math.round((d - today) / (24 * 60 * 60 * 1000));
+}
+
 export const DAY_NAMES = ['Mon','Tue','Wed','Thu','Fri','Sat','Sun'];

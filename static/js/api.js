@@ -1,10 +1,40 @@
 const API = '/api/todos';
 const CHAT_API = '/api/chat';
 
-export async function fetchTodos() {
-    const res = await fetch(`${API}/?order_by=position`);
+export async function fetchTodos(params = {}) {
+    const sp = new URLSearchParams({ order_by: 'position', ...params });
+    const res = await fetch(`${API}/?${sp}`);
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
     return res.json();
+}
+
+export async function fetchStats() {
+    const res = await fetch(`${API}/stats`);
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    return res.json();
+}
+
+export async function fetchTrash() {
+    const res = await fetch(`${API}/trash`);
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    return res.json();
+}
+
+export async function emptyTrash() {
+    const res = await fetch(`${API}/trash`, { method: 'DELETE' });
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    return res.json();
+}
+
+export async function restoreTodo(id) {
+    const res = await fetch(`${API}/${id}/restore`, { method: 'POST' });
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    return res.json();
+}
+
+export async function purgeTodo(id) {
+    const res = await fetch(`${API}/${id}/purge`, { method: 'DELETE' });
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
 }
 
 export async function addTodo(data) {
@@ -25,6 +55,16 @@ export async function toggleTodo(id, isCompleted) {
         body: JSON.stringify({ is_completed: !isCompleted }),
     });
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
+}
+
+export async function updateTodo(id, changes) {
+    const res = await fetch(`${API}/${id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(changes),
+    });
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    return res.json();
 }
 
 export async function deleteTodo(id) {

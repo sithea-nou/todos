@@ -4,6 +4,7 @@ export function InputRow({ onAdd }) {
     const [value, setValue] = useState('');
     const [priority, setPriority] = useState(0);
     const [dueDate, setDueDate] = useState('');
+    const [tags, setTags] = useState('');
 
     const handleSubmit = (e) => {
         e.preventDefault();
@@ -12,10 +13,12 @@ export function InputRow({ onAdd }) {
             title: value.trim(),
             priority: priority || 0,
             due_date: dueDate || null,
+            tags: tags.trim() || null,
         });
         setValue('');
         setPriority(0);
         setDueDate('');
+        setTags('');
     };
 
     return html`
@@ -42,6 +45,13 @@ export function InputRow({ onAdd }) {
                     class="date-input"
                     value=${dueDate}
                     onChange=${e => setDueDate(e.target.value)}
+                />
+                <input
+                    type="text"
+                    class="tag-input"
+                    value=${tags}
+                    onInput=${e => setTags(e.target.value)}
+                    placeholder="tags (comma-separated)"
                 />
             </div>
         </form>

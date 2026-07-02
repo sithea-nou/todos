@@ -1,7 +1,7 @@
 import { html, useState } from '../preact.js';
 import { TodoItem } from './TodoItem.js';
 
-export function TodoList({ todos, onToggle, onDelete, onReorder, filter, totalCount }) {
+export function TodoList({ todos, onToggle, onDelete, onUpdate, onReorder, filter, totalCount }) {
     const [dragIdx, setDragIdx] = useState(null);
     const [overIdx, setOverIdx] = useState(null);
 
@@ -51,6 +51,7 @@ export function TodoList({ todos, onToggle, onDelete, onReorder, filter, totalCo
                     todo=${todo}
                     onToggle=${onToggle}
                     onDelete=${onDelete}
+                    onUpdate=${onUpdate}
                     draggable=${canDrag}
                     onDragStart=${() => handleDragStart(idx)}
                     onDragOver=${(e) => handleDragOver(e, idx)}

@@ -30,23 +30,33 @@ Create a `.env` file at the project root (or set these in your shell):
 |---|---|---|
 | `DATABASE_URL` | `sqlite+aiosqlite:///./todos.db` | Async SQLite connection string |
 | `DEBUG_LOGGING` | `false` | Enable debug logs for LLM calls and database operations |
+| `API_KEY` | — (empty) | Optional API key. When set, non-browser requests must send `Authorization: Bearer <key>` or `X-API-Key: <key>`. The SPA at `/` and `/health` are always allowed. Empty = open access (default). |
+| `CORS_ORIGINS` | — (empty) | Optional CORS allow-list. Set to `*` or a comma-separated list to permit a separate SPA / external client. Empty = same-origin only. |
+| `CHAT_RATE_LIMIT` | `0` | Per-client chat request limit per minute on `/api/chat/*`. `0` disables rate limiting (default). |
 | `CHAT_MODEL` | `claude-sonnet-4-6` | LiteLLM model string (see [Chatbot](#chatbot)) |
 | `ANTHROPIC_API_KEY` | — | Required for Claude models |
 | `OPENAI_API_KEY` | — | Required for GPT models |
 | `OLLAMA_API_KEY` | — | Required for Ollama Cloud |
 | `CHAT_API_BASE` | — | Override base URL for local LLMs |
 
+All security features are **off by default** (empty / `0`) for frictionless local development. The bundled `docker-compose.yml` passes `API_KEY`, `CORS_ORIGINS`, `CHAT_RATE_LIMIT`, and `OLLAMA_API_KEY` through from the host environment.
+
 ## REST API
 
 | Method | Path | Description |
 |---|---|---|
 | GET | `/health` | Health check |
-| GET | `/api/todos/` | List todos (`?completed=true/false`, `?order_by=position/priority/due_date`) |
-| POST | `/api/todos/` | Create a todo (`title` required, `priority` and `due_date` optional) |
+| GET | `/api/todos/` | List todos (`?completed=true/false`, `?order_by=position/priority/due_date`, `?q=`, `?priority=`, `?tag=`, `?limit=`, `?offset=`) |
+| POST | `/api/todos/` | Create a todo (`title` required; `priority`, `due_date`, `tags` optional) |
 | GET | `/api/todos/{id}` | Get a todo |
-| PATCH | `/api/todos/{id}` | Partial update (supports `priority`, `due_date`, `is_completed`, `title`, `description`) |
-| DELETE | `/api/todos/{id}` | Delete a todo |
+| PATCH | `/api/todos/{id}` | Partial update (supports `priority`, `due_date`, `is_completed`, `title`, `description`, `tags`; set `tags`/`due_date` to `null` to clear) |
+| DELETE | `/api/todos/{id}` | Soft-delete a todo (movable to trash; restore later) |
 | PATCH | `/api/todos/reorder` | Batch reorder (`{items: [{id, position}, …]}`) |
+| GET | `/api/todos/stats` | Aggregate counts (total/active/completed/overdue/by_priority) |
+| GET | `/api/todos/trash` | List soft-deleted todos (newest-deleted first) |
+| DELETE | `/api/todos/trash` | Permanently delete every soft-deleted todo |
+| POST | `/api/todos/{id}/restore` | Restore a soft-deleted todo |
+| DELETE | `/api/todos/{id}/purge` | Permanently delete a single todo |
 | POST | `/api/chat/` | Send a message to the AI chatbot (non-streaming) |
 | POST | `/api/chat/stream` | Send a message and stream the reply via SSE |
 | GET | `/api/chat/info` | Active provider, model, capability flags |
@@ -56,6 +66,16 @@ Create a `.env` file at the project root (or set these in your shell):
 | GET | `/api/chat/sessions/{id}` | Fetch a single chat session |
 | GET | `/api/chat/sessions/{id}/messages` | List messages for a session |
 | DELETE | `/api/chat/sessions/{id}` | Delete a session and its messages |
+
+Query parameters for `GET /api/todos/`:
+- `completed` — `true`/`false` filter on completion status
+- `order_by` — `position` (default), `priority`, or `due_date`
+- `q` — case-insensitive substring search over title + description
+- `priority` — filter by exact priority (`0`=none, `1`=low, `2`=med, `3`=high)
+- `tag` — filter by a single tag token (tags are stored comma-separated)
+- `limit` / `offset` — pagination (`limit` 1–500, `offset` >= 0)
+
+All todo queries exclude soft-deleted rows by default (i.e. items in the trash don't appear in the main list, stats, or reorder results).
 
 Interactive docs at `/docs` (Swagger UI) and `/redoc` when the server is running.
 
@@ -205,6 +225,10 @@ services:
       - DATABASE_URL=sqlite+aiosqlite:////app/data/todos.db
       - CHAT_MODEL=ollama/llama3.1
       - CHAT_API_BASE=http://ollama:11434
+      # Security (all optional — empty = feature off)
+      - API_KEY=
+      - CORS_ORIGINS=
+      - CHAT_RATE_LIMIT=0
     depends_on:
       - ollama
     volumes:
@@ -272,13 +296,17 @@ The app exposes a [Model Context Protocol](https://modelcontextprotocol.io) serv
 
 | Tool | Description |
 |---|---|
-| `list_todos` | List all todos; optional `completed` bool filter and `order_by` sort (`position`, `priority`, `due_date`) |
-| `get_todo` | Fetch a single todo by UUID |
-| `create_todo` | Create a new todo (`title` required, `priority` and `due_date` optional) |
-| `update_todo` | Partial update — only the fields you pass are changed; set `due_date` to `"clear"` to remove it |
-| `delete_todo` | Delete a todo by UUID |
-| `clear_completed` | Delete every completed todo; returns a count summary |
+| `list_todos` | List todos; optional `completed`, `order_by` (`position`/`priority`/`due_date`), `q` (substring search), `priority`, `tag`, `limit`, `offset` |
+| `get_todo` | Fetch a single (active) todo by UUID |
+| `create_todo` | Create a todo (`title` required; `description`, `priority`, `due_date`, `tags` optional) |
+| `update_todo` | Partial update — only the fields you pass are changed; set `due_date` to `"clear"` or `tags` to `"clear"` to remove them |
+| `delete_todo` | Soft-delete a todo by UUID (movable to trash; restore later) |
+| `restore_todo` | Restore a previously soft-deleted todo from the trash |
+| `clear_completed` | Soft-delete every completed todo; returns a count summary |
 | `reorder_todos` | Batch reorder by position (`items: [{id, position}, …]`) |
+| `get_todo_stats` | Aggregate counts (total/active/completed/overdue/by_priority) |
+
+Tags are stored as a comma-separated string. Use `"clear"` (not `null`) to remove `due_date` or `tags` via the MCP tools, since `null` means "leave unchanged". Tool descriptions instruct the LLM to only set optional fields when the user mentions them.
 
 ### Connecting Claude Desktop
 
@@ -337,6 +365,7 @@ static/
         ├── TodoList.js
         ├── TodoItem.js
         ├── CalendarView.js
+        ├── TrashView.js
         ├── ChatBubble.js
         ├── ChatPanel.js
         ├── ThemeToggle.js
@@ -347,9 +376,14 @@ static/
 
 ### Features
 
-- **List view** — Filter pills (All / Active / Completed), drag-and-drop reorder, priority badges (P1/P2/P3), due dates with overdue highlighting
+- **List view** — Filter pills (All / Active / Completed), drag-and-drop reorder, priority badges (P1/P2/P3), due dates with overdue / due-soon highlighting, **inline edit** (double-click a todo — or click its title / pencil icon — to edit title, description, and tags inline; Enter saves, Esc cancels), **tag chips**
 - **Calendar view** — Weekly grid with prev/next week navigation, "Today" button, priority-sorted cards, unscheduled section, "Other dates" section for out-of-week todos
-- **Add-todo form** — Priority dropdown (None / P3 / P2 / P1) and date picker
+- **Add-todo form** — Priority dropdown (None / P3 / P2 / P1), date picker, and comma-separated tags input
+- **Search** — Substring search over title + description (top-right search box)
+- **Priority filter** — Dropdown to filter by a single priority value
+- **Stats bar** — Total / active / completed / overdue counts sourced from `/api/todos/stats`
+- **Trash view** — Soft-deleted todos with restore / purge-permanently / empty-trash actions (toggle via the trash icon in the toolbar)
+- **Browser reminders** — Notifications for overdue and due-soon todos (requests Notification permission)
 - **AI chat widget** — Streaming responses, session persistence, provider detection
 - **Theme toggle** — Light / Auto / Dark, persisted in localStorage
 
@@ -391,19 +425,23 @@ Debug mode is useful for:
 ```
 app/
 ├── main.py                   # FastAPI app + static mount + MCP mount at /mcp
-├── config.py                 # pydantic-settings (DATABASE_URL, CHAT_MODEL, etc.)
+├── config.py                 # pydantic-settings (DATABASE_URL, CHAT_MODEL, API_KEY, etc.)
 ├── database.py               # async engine + session factory
 ├── dependencies.py           # get_todo_or_404 FastAPI dependency
-├── mcp_server.py             # FastMCP server with 7 tools
+├── mcp_server.py             # FastMCP server with 9 tools
 ├── models/
-│   ├── todo.py               # SQLModel ORM + Pydantic schemas
+│   ├── todo.py               # SQLModel ORM + Pydantic schemas (incl. TodoStats)
 │   └── chat.py               # ChatSession + ChatMessage ORM & schemas
 ├── routers/
 │   ├── todos.py               # REST CRUD routes (/api/todos/)
 │   ├── chat.py                # Chat streaming/non-streaming + info + models
 │   └── chat_sessions.py       # Chat session CRUD (/api/chat/sessions)
+├── security/                  # Optional auth, CORS, rate-limit middleware (all off by default)
+│   ├── auth.py                # API-key middleware (enabled when API_KEY set)
+│   ├── cors.py                # CORS from CORS_ORIGINS
+│   └── rate_limit.py          # Per-client /api/chat rate limiting
 └── services/
-    ├── todo_service.py        # business logic layer
+    ├── todo_service.py        # business logic (search/tags/stats/soft-delete)
     ├── chat_service.py        # LLM agentic loop via LiteLLM (tools → MCP)
     └── chat_history.py        # chat session + message persistence
 
@@ -418,13 +456,14 @@ static/                        # Frontend assets (no build step)
     ├── main.js                 # Entry point: renders <App />
     ├── app.js                  # App component (state, API calls)
     ├── api.js                  # API helper functions
-    ├── utils.js                # formatDate, priorityBadge, etc.
+    ├── utils.js                # formatDate, priorityBadge, parseTags, isDueSoon, etc.
     └── components/
         ├── InputRow.js
         ├── Toolbar.js
         ├── TodoList.js
         ├── TodoItem.js
         ├── CalendarView.js
+        ├── TrashView.js
         ├── ChatBubble.js
         ├── ChatPanel.js
         ├── ThemeToggle.js
@@ -434,14 +473,18 @@ tests/
 ├── conftest.py                # session, client, mcp_client fixtures
 ├── test_routers/
 │   ├── test_todos.py          # HTTP endpoint tests
+│   ├── test_todos_new.py      # Search/filter/pagination/stats/trash/restore tests
 │   ├── test_chat.py           # Non-streaming chat tests
-│   └── test_chat_endpoints.py  # SSE, sessions, models tests
+│   ├── test_chat_endpoints.py  # SSE, sessions, models tests
+│   └── test_security.py       # Auth + rate-limit middleware tests
 ├── test_services/
 │   ├── test_todo_service.py    # Service-layer unit tests
+│   ├── test_todo_service_new.py  # Search/tags/pagination/stats/soft-delete tests
 │   ├── test_chat_service.py    # Chat service + MCP tool tests
 │   └── test_chat_history.py   # Chat persistence tests
 └── test_mcp/
-    └── test_mcp_server.py      # MCP tool tests (in-process fastmcp.Client)
+    ├── test_mcp_server.py      # MCP tool tests (in-process fastmcp.Client)
+    └── test_mcp_server_new.py  # Extended list/search/stats/restore tool tests
 ```
 
 See [`AGENTS.md`](../AGENTS.md) for the full architecture specification and [`CONTRIBUTING.md`](../CONTRIBUTING.md) for development guidelines.

@@ -58,6 +58,7 @@ root/
 │           ├── TodoList.js
 │           ├── TodoItem.js
 │           ├── CalendarView.js
+│           ├── TrashView.js
 │           ├── ChatBubble.js
 │           ├── ChatPanel.js
 │           ├── ThemeToggle.js
@@ -67,9 +68,10 @@ root/
 │   ├── config.py            # pydantic-settings
 │   ├── database.py          # Async engine + session factory
 │   ├── dependencies.py      # FastAPI dependencies
-│   ├── mcp_server.py        # FastMCP server (7 tools)
+│   ├── mcp_server.py        # FastMCP server (9 tools)
 │   ├── models/              # SQLModel ORM + Pydantic schemas
 │   ├── routers/             # REST API route handlers
+│   ├── security/            # Optional auth, CORS, rate-limit middleware
 │   └── services/            # Business logic layer
 ├── tests/                   # pytest + pytest-asyncio + httpx
 ├── scripts/                 # Utility scripts (seed.py)

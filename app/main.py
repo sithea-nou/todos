@@ -14,6 +14,9 @@ from app.config import settings
 from app.database import init_db
 from app.mcp_server import mcp
 from app.routers import chat, chat_sessions, todos
+from app.security.auth import ApiKeyMiddleware
+from app.security.cors import add_cors
+from app.security.rate_limit import RateLimitMiddleware
 
 # Configure logging based on DEBUG_LOGGING setting
 if settings.debug_logging:
@@ -36,6 +39,12 @@ app = FastAPI(
     debug=settings.debug,
     lifespan=combine_lifespans(app_lifespan, mcp_app.lifespan),
 )
+
+# Security middlewares (all optional / config-driven).
+# Order matters: CORS first (headers), then auth (reject early), then rate limit.
+add_cors(app)
+app.add_middleware(ApiKeyMiddleware)
+app.add_middleware(RateLimitMiddleware)
 
 app.include_router(todos.router, prefix="/api/todos", tags=["todos"])
 app.include_router(chat.router, prefix="/api/chat", tags=["chat"])

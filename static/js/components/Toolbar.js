@@ -1,10 +1,17 @@
 import { html } from '../preact.js';
 
-export function Toolbar({ filter, onFilterChange, completedCount, onClearCompleted, viewMode, onViewModeChange }) {
+export function Toolbar({ filter, onFilterChange, completedCount, onClearCompleted, viewMode, onViewModeChange, search, onSearchChange, priorityFilter, onPriorityFilterChange, showTrash, onToggleTrash }) {
     const filters = [
         { key: 'all', label: 'All' },
         { key: 'active', label: 'Active' },
         { key: 'completed', label: 'Completed' },
+    ];
+    const priorities = [
+        { key: null, label: 'Any' },
+        { key: 0, label: 'None' },
+        { key: 1, label: 'P3' },
+        { key: 2, label: 'P2' },
+        { key: 3, label: 'P1' },
     ];
 
     return html`
@@ -35,12 +42,25 @@ export function Toolbar({ filter, onFilterChange, completedCount, onClearComplet
                         >${f.label}</button>
                     `)}
                 </div>
+                <select class="priority-filter" value=${priorityFilter === null ? 'any' : String(priorityFilter)}
+                    onChange=${e => onPriorityFilterChange(e.target.value === 'any' ? null : Number(e.target.value))}
+                    title="Filter by priority">
+                    ${priorities.map(p => html`<option value=${p.key === null ? 'any' : String(p.key)}>${p.label}</option>`)}
+                </select>
             </div>
-            <button
-                class="clear-btn"
-                disabled=${completedCount === 0}
-                onClick=${onClearCompleted}
-            >Clear completed</button>
+            <div class="toolbar-right">
+                <input class="search-input" type="text" value=${search}
+                    onInput=${e => onSearchChange(e.target.value)}
+                    placeholder="Search..." />
+                <button class=${`trash-btn${showTrash ? ' active' : ''}`} onClick=${onToggleTrash} title="Trash">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/><path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"/></svg>
+                </button>
+                <button
+                    class="clear-btn"
+                    disabled=${completedCount === 0}
+                    onClick=${onClearCompleted}
+                >Clear completed</button>
+            </div>
         </div>
     `;
 }

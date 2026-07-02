@@ -8,6 +8,7 @@ The instance is mounted in `app/main.py` at `/mcp` over Streamable HTTP.
 """
 
 from collections.abc import Awaitable, Callable
+from datetime import date as date_type
 from typing import Any
 from uuid import UUID
 
@@ -32,36 +33,59 @@ async def _session_do[T](coro: Callable[[AsyncSession], Awaitable[T]]) -> T:
         return await coro(session)
 
 
+def _parse_uuid(todo_id: str) -> UUID:
+    """Parse and validate a UUID string, raising ValueError with context."""
+    try:
+        return UUID(todo_id)
+    except ValueError as exc:
+        raise ValueError(f"Invalid todo id: {todo_id!r}") from exc
+
+
 @mcp.tool
 async def list_todos(
     completed: bool | None = None,
     order_by: str = "position",
+    q: str | None = None,
+    priority: int | None = None,
+    tag: str | None = None,
+    limit: int | None = None,
+    offset: int | None = None,
 ) -> list[dict[str, Any]]:
-    """List all todos. Optionally filter by completion status and control ordering.
+    """List todos. Optionally filter, search, paginate, and sort.
 
     Args:
         completed: True to return only completed todos, False for only active,
             None (default) for all.
         order_by: Sort order — "position" (default), "priority", or "due_date".
+        q: Optional substring search over title and description (case-insensitive).
+        priority: Filter by exact priority value (0=none, 1=low, 2=med, 3=high).
+        tag: Filter by a tag token (tags are stored comma-separated).
+        limit: Optional max number of todos to return (1-500).
+        offset: Optional number of todos to skip (>= 0).
     """
     todos = await _session_do(
-        lambda s: todo_service.list_todos(s, completed=completed, order_by=order_by)
+        lambda s: todo_service.list_todos(
+            s,
+            completed=completed,
+            order_by=order_by,
+            q=q,
+            priority=priority,
+            tag=tag,
+            limit=limit,
+            offset=offset,
+        )
     )
     return [_serialize(t) for t in todos]
 
 
 @mcp.tool
 async def get_todo(todo_id: str) -> dict[str, Any]:
-    """Fetch a single todo by its UUID.
+    """Fetch a single (active) todo by its UUID.
 
     Args:
         todo_id: The UUID of the todo (as a string).
     """
-    try:
-        parsed = UUID(todo_id)
-    except ValueError as exc:
-        raise ValueError(f"Invalid todo id: {todo_id!r}") from exc
-
+    parsed = _parse_uuid(todo_id)
     todo = await _session_do(lambda s: todo_service.get_todo(s, parsed))
     if todo is None:
         raise ValueError(f"Todo {todo_id} not found")
@@ -74,6 +98,7 @@ async def create_todo(
     description: str | None = None,
     priority: int | None = None,
     due_date: str | None = None,
+    tags: str | None = None,
 ) -> dict[str, Any]:
     """Create a new todo.
 
@@ -84,9 +109,9 @@ async def create_todo(
             Only set this if the user explicitly mentions priority.
         due_date: Optional due date in YYYY-MM-DD format.
             Only set this if the user mentions a deadline.
+        tags: Optional comma-separated tags, e.g. "work,urgent".
+            Only set this if the user mentions tags or categories.
     """
-    from datetime import date as date_type
-
     parsed_date = None
     if due_date is not None:
         parsed_date = date_type.fromisoformat(due_date)
@@ -96,6 +121,7 @@ async def create_todo(
         description=description,
         priority=priority if priority is not None else 0,
         due_date=parsed_date,
+        tags=tags,
     )
     todo = await _session_do(lambda s: todo_service.create_todo(s, payload))
     return _serialize(todo)
@@ -109,6 +135,7 @@ async def update_todo(
     is_completed: bool | None = None,
     priority: int | None = None,
     due_date: str | None = None,
+    tags: str | None = None,
 ) -> dict[str, Any]:
     """Update an existing todo. Only the fields you provide are changed.
 
@@ -121,11 +148,10 @@ async def update_todo(
             Only set if the user explicitly asks to change priority.
         due_date: New due date in YYYY-MM-DD format, or "clear" to
             remove it. Only set if the user mentions a deadline.
+        tags: New comma-separated tags, e.g. "work,urgent". Use "clear" to
+            remove all tags. Only set if the user mentions tags.
     """
-    try:
-        parsed = UUID(todo_id)
-    except ValueError as exc:
-        raise ValueError(f"Invalid todo id: {todo_id!r}") from exc
+    parsed = _parse_uuid(todo_id)
 
     changes: dict[str, Any] = {}
     if title is not None:
@@ -137,12 +163,12 @@ async def update_todo(
     if priority is not None:
         changes["priority"] = priority
     if due_date is not None:
-        from datetime import date as date_type
-
         if due_date == "clear":
             changes["due_date"] = None
         else:
             changes["due_date"] = date_type.fromisoformat(due_date)
+    if tags is not None:
+        changes["tags"] = None if tags == "clear" else tags
 
     payload = TodoUpdate(**changes)
     todo = await _session_do(lambda s: todo_service.update_todo(s, parsed, payload))
@@ -153,16 +179,12 @@ async def update_todo(
 
 @mcp.tool
 async def delete_todo(todo_id: str) -> str:
-    """Delete a todo by its UUID.
+    """Move a todo to the trash (soft-delete). It can be restored later.
 
     Args:
         todo_id: The UUID of the todo.
     """
-    try:
-        parsed = UUID(todo_id)
-    except ValueError as exc:
-        raise ValueError(f"Invalid todo id: {todo_id!r}") from exc
-
+    parsed = _parse_uuid(todo_id)
     deleted = await _session_do(lambda s: todo_service.delete_todo(s, parsed))
     if not deleted:
         raise ValueError(f"Todo {todo_id} not found")
@@ -170,12 +192,28 @@ async def delete_todo(todo_id: str) -> str:
 
 
 @mcp.tool
-async def clear_completed() -> str:
-    """Delete every todo that is currently marked as completed.
+async def restore_todo(todo_id: str) -> dict[str, Any]:
+    """Restore a previously soft-deleted todo from the trash.
 
-    Returns a summary of how many were removed.
+    Args:
+        todo_id: The UUID of the todo to restore.
     """
-    completed = await _session_do(lambda s: todo_service.list_todos(s, completed=True))
+    parsed = _parse_uuid(todo_id)
+    todo = await _session_do(lambda s: todo_service.restore_todo(s, parsed))
+    if todo is None:
+        raise ValueError(f"Todo {todo_id} not found in trash")
+    return _serialize(todo)
+
+
+@mcp.tool
+async def clear_completed() -> str:
+    """Soft-delete every todo that is currently marked as completed.
+
+    Returns a summary of how many were moved to the trash.
+    """
+    completed = await _session_do(
+        lambda s: todo_service.list_todos(s, completed=True)
+    )
     count = 0
     async with async_session_factory() as session:
         for todo in completed:
@@ -198,3 +236,15 @@ async def reorder_todos(items: list[dict[str, Any]]) -> list[dict[str, Any]]:
         parsed.append((UUID(item["id"]), int(item["position"])))
     todos = await _session_do(lambda s: todo_service.reorder_todos(s, parsed))
     return [_serialize(t) for t in todos]
+
+
+@mcp.tool
+async def get_todo_stats() -> dict[str, Any]:
+    """Return aggregate stats over the active todo set:
+
+    - total, active, completed, overdue counts
+    - by_priority: {priority_value: count}
+    Useful for summarising the user's workload at a glance.
+    """
+    stats = await _session_do(lambda s: todo_service.get_stats(s))
+    return stats.model_dump(mode="json")

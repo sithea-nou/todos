@@ -1,0 +1,94 @@
+name: Release
+
+# Triggered by pushing a tag like `v0.2.0` to the repo.
+# Builds a versioned Docker image, pushes it to GHCR with semver tags,
+# and creates a GitHub Release with auto-generated notes.
+on:
+  push:
+    tags:
+      - "v*.*.*"
+
+permissions:
+  contents: write   # create the GitHub Release
+  packages: write    # push the image to GHCR
+
+jobs:
+  validate:
+    name: Lint, type check & test
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: astral-sh/setup-uv@v6
+        with:
+          enable-cache: true
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+
+      - name: Install dependencies
+        run: uv sync --all-extras
+
+      - name: Ruff
+        run: uv run ruff check app/ tests/
+
+      - name: Mypy
+        run: uv run mypy app/
+
+      - name: Pytest
+        run: uv run --all-extras pytest --cov=app --cov-report=term-missing
+
+  release:
+    name: Build image, push to GHCR, create GitHub Release
+    runs-on: ubuntu-latest
+    needs: validate
+    steps:
+      - uses: actions/checkout@v4
+
+      # Strip the leading "v" from the tag → "0.2.0"
+      - name: Derive version
+        id: ver
+        run: echo "version=${GITHUB_REF_NAME#v}" >> "$GITHUB_OUTPUT"
+
+      # Semver minor + patch for users who want to pin loosely or tightly.
+      # e.g. v0.2.0 → 0.2.0, 0.2, latest
+      - name: Derive semver tags
+        id: semver
+        run: |
+          v="${{ steps.ver.outputs.version }}"
+          minor="$(echo "$v" | cut -d. -f1-2)"
+          echo "tags=ghcr.io/${{ github.repository }}:$v
+          ghcr.io/${{ github.repository }}:$minor
+          ghcr.io/${{ github.repository }}:latest" >> "$GITHUB_OUTPUT"
+
+      - uses: docker/setup-buildx-action@v3
+
+      - name: Log in to GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build and push image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          push: true
+          tags: ${{ steps.semver.outputs.tags }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+          provenance: false
+
+      - name: Create GitHub Release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh release create "${{ github.ref_name }}" \
+            --title "${{ github.ref_name }}" \
+            --generate-notes \
+            --notes-footer "---
+
+          **Docker image**: \`ghcr.io/${{ github.repository }}:${{ steps.ver.outputs.version }}\`
+          **Pull it**: \`docker pull ghcr.io/${{ github.repository }}:${{ steps.ver.outputs.version }}\`"

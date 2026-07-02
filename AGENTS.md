@@ -67,7 +67,8 @@ root/
 ├── .env.example          # Committed template for .env
 ├── .github/
 │   └── workflows/
-│       └── ci.yml        # CI: lint, test, docker build, push to GHCR
+│       ├── ci.yml        # CI: lint, test, docker build, push to GHCR
+│       └── release.yml   # Release: on tag push, versioned image + GitHub Release
 ├── scripts/
 │   └── seed.py           # DB seeding helper (uv run python scripts/seed.py)
 ├── app/
@@ -155,6 +156,10 @@ docker compose up --build                                    # containerised run
   2. **test** — `pytest --cov=app --cov-report=term-missing`
   3. **docker-build** — builds the image (cached via GHA cache)
   4. **docker-push** — on push to `main` only, pushes `latest` + `:sha` tags to `ghcr.io/${{ github.repository }}`
+- `.github/workflows/release.yml` runs on pushing a `v*.*.*` tag:
+  1. **validate** — ruff + mypy + pytest (gates the release)
+  2. **release** — builds + pushes a versioned image to GHCR (semver tags: `0.2.0`, `0.2`, `latest`) and creates a GitHub Release with auto-generated notes
+  - Cut a release with: `git tag v0.2.0 && git push origin v0.2.0` (bump `version` in `pyproject.toml` first)
 - Local pre-commit hooks (see `.pre-commit-config.yaml`) run ruff + mypy before each commit.
 
 ---

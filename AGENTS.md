@@ -66,9 +66,10 @@ root/
 ├── .env                  # Local secrets (gitignored)
 ├── .env.example          # Committed template for .env
 ├── .github/
-│   └── workflows/
-│       ├── ci.yml        # CI: lint, test, docker build, push to GHCR
-│       └── release.yml   # Release: on tag push, versioned image + GitHub Release
+│   ├── workflows/
+│   │   ├── ci.yml        # CI: lint, test, docker build, push to GHCR
+│   │   └── release.yml   # Release: on tag push, versioned image + GitHub Release
+│   └── dependabot.yml   # Dependency updates (uv + docker + github-actions)
 ├── scripts/
 │   └── seed.py           # DB seeding helper (uv run python scripts/seed.py)
 ├── app/

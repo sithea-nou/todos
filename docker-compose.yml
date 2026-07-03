@@ -1,6 +1,9 @@
 services:
   app:
-    build: .
+    # Pull the multi-arch release image from GHCR (amd64 + arm64).
+    # To build locally instead, comment out `image:` and uncomment `build:`.
+    image: ghcr.io/sithea-nou/todos:latest
+    # build: .
     container_name: mytodo-app
     restart: unless-stopped
     ports:

@@ -155,12 +155,13 @@ docker compose up --build                                    # containerised run
 - `.github/workflows/ci.yml` runs on every push/PR to `main`:
   1. **lint** — `ruff check` + `mypy` on `app/`
   2. **test** — `pytest --cov=app --cov-report=term-missing`
-  3. **docker-build** — builds the image (cached via GHA cache)
-  4. **docker-push** — on push to `main` only, pushes `latest` + `:sha` tags to `ghcr.io/${{ github.repository }}`
+  3. **docker-build** — builds the multi-arch image (linux/amd64 + linux/arm64, cached via GHA cache)
+  4. **docker-push** — on push to `main` only, pushes multi-arch `latest` + `:sha` tags to `ghcr.io/${{ github.repository }}`
 - `.github/workflows/release.yml` runs on pushing a `v*.*.*` tag:
   1. **validate** — ruff + mypy + pytest (gates the release)
-  2. **release** — builds + pushes a versioned image to GHCR (semver tags: `0.2.0`, `0.2`, `latest`) and creates a GitHub Release with auto-generated notes
+  2. **release** — builds + pushes a multi-arch versioned image to GHCR (semver tags: `0.2.0`, `0.2`, `latest`) and creates a GitHub Release with auto-generated notes
   - Cut a release with: `git tag v0.2.0 && git push origin v0.2.0` (bump `version` in `pyproject.toml` first)
+- `docker-compose.yml` pulls `ghcr.io/sithea-nou/todos:latest` from GHCR (no local build). Comment out `image:` and uncomment `build: .` to build locally instead.
 - Local pre-commit hooks (see `.pre-commit-config.yaml`) run ruff + mypy before each commit.
 
 ---

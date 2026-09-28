@@ -12,7 +12,7 @@ dependencies = [
     "sqlmodel>=0.0.42",
     "aiosqlite>=0.20.0",
     "python-dotenv>=1.2.3",
-    "fastmcp>=2.0.0",
+    "fastmcp>=4.0.9",
     "anthropic>=0.115.1",
     "litellm>=1.99.0",
 ]
